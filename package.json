@@ -1,0 +1,9 @@
+{
+  "name": "github-markdown-tab-indent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tab / Shift-Tab indent and dedent in GitHub markdown textareas.",
+  "scripts": {
+    "test": "node --test"
+  }
+}
