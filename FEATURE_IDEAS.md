@@ -87,6 +87,17 @@ So phase 2's indent amount must be derived from the enclosing list item's marker
 constant. **Blockquotes are out of scope for this rule** — they nest via stacked `>` markers
 (`>` then `> >`), not leading spaces, so Tab indentation does not apply to them.
 
+## Known unsupported surfaces
+
+- **Projects issue side-pane.** The extension does not trigger when editing a comment from
+  the Projects "issue pane" view, e.g.
+  `https://github.com/orgs/<org>/projects/<n>/views/<v>?pane=issue&itemId=…&issue=…`.
+  The content script matches `https://github.com/*` so it does inject on that page, but the
+  comment editor in the pane isn't being caught/handled — needs investigation (different
+  editor markup, an iframe/shadow boundary, or the pane's keydown handling intercepting Tab
+  before our capture-phase listener). Worth probing this surface's DOM the way we probed the
+  comment composer, then extending the selector / handling to cover it.
+
 ## Other candidates (unprioritized)
 
 - Configurable indent unit (2 spaces default vs. tabs vs. 4 spaces).

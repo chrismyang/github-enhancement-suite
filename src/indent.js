@@ -1,55 +1,123 @@
 const INDENT_UNIT = '  ';
 
+function listMarker(line) {
+  const m = /^( *)([-*+]|\d+[.)])( +)/.exec(line);
+  if (!m) return null;
+  const indent = m[1].length;
+  const markerWidth = m[2].length + m[3].length;
+  return { indent, markerWidth, contentCol: indent + markerWidth };
+}
+
+function precedingListContentCols(value, lineStart) {
+  const cols = [];
+  let end = lineStart - 1; // index of the '\n' ending the previous line, or -1 if none
+  while (end >= 0) {
+    const prevLineStart = value.lastIndexOf('\n', end - 1) + 1;
+    const prevLine = value.slice(prevLineStart, end);
+    const lm = listMarker(prevLine);
+    if (!lm) break; // non-list or blank line ends the contiguous block
+    cols.push(lm.contentCol);
+    end = prevLineStart - 1;
+  }
+  return cols;
+}
+
 function computeIndent(value, selStart, selEnd, opts) {
   const dedent = !!(opts && opts.dedent);
   const collapsed = selStart === selEnd;
 
-  // Branch 1: collapsed caret + Tab -> insert indent unit at caret
-  if (collapsed && !dedent) {
-    const caret = selStart + INDENT_UNIT.length;
-    return {
-      rangeStart: selStart,
-      rangeEnd: selStart,
-      text: INDENT_UNIT,
-      newSelStart: caret,
-      newSelEnd: caret,
-    };
-  }
-
-  // Branch 2: collapsed caret + Shift-Tab -> strip up to INDENT_UNIT leading spaces
-  if (collapsed && dedent) {
+  if (collapsed) {
     const lineStart = value.lastIndexOf('\n', selStart - 1) + 1;
+    let lineEnd = value.indexOf('\n', selStart);
+    if (lineEnd === -1) lineEnd = value.length;
+    const line = value.slice(lineStart, lineEnd);
+    const lm = listMarker(line);
+
+    if (lm) {
+      // List item: indent/dedent the whole line by one nesting level.
+      let newIndent;
+      if (!dedent) {
+        const cols = precedingListContentCols(value, lineStart);
+        const deeper = cols.filter(c => c > lm.indent);
+        newIndent = deeper.length ? Math.min(...deeper) : lm.indent + lm.markerWidth;
+      } else {
+        if (lm.indent === 0) return null;
+        const cols = precedingListContentCols(value, lineStart);
+        const shallower = cols.filter(c => c < lm.indent);
+        shallower.push(0);
+        newIndent = Math.max(...shallower);
+      }
+      const delta = newIndent - lm.indent;
+      if (delta === 0) return null;
+      if (delta > 0) {
+        const caret = selStart + delta;
+        return { rangeStart: lineStart, rangeEnd: lineStart, text: ' '.repeat(delta), newSelStart: caret, newSelEnd: caret };
+      }
+      const remove = -delta;
+      const caret = Math.max(lineStart, selStart - remove);
+      return { rangeStart: lineStart, rangeEnd: lineStart + remove, text: '', newSelStart: caret, newSelEnd: caret };
+    }
+
+    // Not a list line -> v1 behavior.
+    if (!dedent) {
+      const caret = selStart + INDENT_UNIT.length;
+      return { rangeStart: selStart, rangeEnd: selStart, text: INDENT_UNIT, newSelStart: caret, newSelEnd: caret };
+    }
     let i = 0;
     while (i < INDENT_UNIT.length && value[lineStart + i] === ' ') i++;
     if (i === 0) return null;
     const caret = Math.max(lineStart, selStart - i);
-    return {
-      rangeStart: lineStart,
-      rangeEnd: lineStart + i,
-      text: '',
-      newSelStart: caret,
-      newSelEnd: caret,
-    };
+    return { rangeStart: lineStart, rangeEnd: lineStart + i, text: '', newSelStart: caret, newSelEnd: caret };
   }
 
-  // Branch 3: non-collapsed selection -> line-mode indent/dedent of all touched lines
+  // Selection: shift the affected block by one uniform level (list-aware via the first line).
   const lineStart = value.lastIndexOf('\n', selStart - 1) + 1;
   let effectiveEnd = selEnd;
-  if (selEnd > 0 && value[selEnd - 1] === '\n') effectiveEnd = selEnd - 1; // don't pull in the next line
+  if (value[selEnd - 1] === '\n') effectiveEnd = selEnd - 1; // don't pull in the next line
   let lineEnd = value.indexOf('\n', effectiveEnd);
   if (lineEnd === -1) lineEnd = value.length;
 
   const block = value.slice(lineStart, lineEnd);
+  const nl = block.indexOf('\n');
+  const firstLine = nl === -1 ? block : block.slice(0, nl);
+  const flm = listMarker(firstLine);
+
+  let delta;
+  if (!dedent) {
+    if (flm) {
+      const cols = precedingListContentCols(value, lineStart);
+      const deeper = cols.filter(c => c > flm.indent);
+      const newIndent = deeper.length ? Math.min(...deeper) : flm.indent + flm.markerWidth;
+      delta = newIndent - flm.indent;
+    } else {
+      delta = INDENT_UNIT.length;
+    }
+  } else {
+    if (flm) {
+      if (flm.indent === 0) {
+        delta = 0;
+      } else {
+        const cols = precedingListContentCols(value, lineStart);
+        const shallower = cols.filter(c => c < flm.indent);
+        shallower.push(0);
+        delta = flm.indent - Math.max(...shallower);
+      }
+    } else {
+      delta = INDENT_UNIT.length;
+    }
+  }
+  if (delta === 0) return null;
+
   const newBlock = block
     .split('\n')
-    .map(function (line) {
-      if (dedent) {
-        let i = 0;
-        while (i < INDENT_UNIT.length && line[i] === ' ') i++;
-        return line.slice(i);
+    .map(function (lineText) {
+      if (!dedent) {
+        if (lineText.length === 0) return lineText; // never indent a blank line
+        return ' '.repeat(delta) + lineText;
       }
-      if (line.length === 0) return line; // never indent a blank line
-      return INDENT_UNIT + line;
+      let i = 0;
+      while (i < delta && lineText[i] === ' ') i++;
+      return lineText.slice(i);
     })
     .join('\n');
 
@@ -68,7 +136,9 @@ if (typeof globalThis !== 'undefined') {
   globalThis.GMTI = globalThis.GMTI || {};
   globalThis.GMTI.computeIndent = computeIndent;
   globalThis.GMTI.INDENT_UNIT = INDENT_UNIT;
+  globalThis.GMTI.listMarker = listMarker;
+  globalThis.GMTI.precedingListContentCols = precedingListContentCols;
 }
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { computeIndent, INDENT_UNIT };
+  module.exports = { computeIndent, INDENT_UNIT, listMarker, precedingListContentCols };
 }
