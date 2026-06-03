@@ -71,14 +71,24 @@ Manifest V3 extension with a single content script injected on `https://github.c
 ### Target selector list (single source of truth)
 
 ```
-textarea[aria-label="Markdown value"]      // React UI (comments + descriptions)
+textarea[aria-label="Markdown value"]      // React UI: issue/PR description
 textarea.js-comment-field                  // classic comment box
 textarea[name="issue[body]"]               // classic issue description
 textarea[name="pull_request[body]"]        // classic PR description
 textarea[name="comment[body]"]             // classic comment variants
 ```
 
-Permissive union; kept in one constant so it is trivial to extend as GitHub's DOM shifts.
+Plus a structural match: any `<textarea>` whose `closest()` ancestor matches
+`[class*="MarkdownEditor-module"], [class*="MarkdownInput-module"]`.
+
+Integration testing (post-implementation) revealed the React **comment composer**
+textarea uses `aria-labelledby="comment-composer-heading"` rather than
+`aria-label="Markdown value"`, so the explicit list alone missed it. Both the
+description and the comment composer render inside the Primer
+`MarkdownEditor`/`MarkdownInput` module wrapper, so matching that wrapper covers
+both surfaces and is resilient to the per-build hash on the textarea's own class,
+while still ignoring unrelated page textareas. The explicit list is retained as a
+fast path and for the classic (non-React) UI.
 
 ## The pure core: `computeIndent`
 
