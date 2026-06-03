@@ -5,5 +5,8 @@
   "description": "Tab / Shift-Tab indent and dedent in GitHub markdown textareas.",
   "scripts": {
     "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

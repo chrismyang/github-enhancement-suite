@@ -35,7 +35,7 @@ function computeIndent(value, selStart, selEnd, opts) {
   // Branch 3: non-collapsed selection -> line-mode indent/dedent of all touched lines
   const lineStart = value.lastIndexOf('\n', selStart - 1) + 1;
   let effectiveEnd = selEnd;
-  if (value[selEnd - 1] === '\n') effectiveEnd = selEnd - 1; // don't pull in the next line
+  if (selEnd > 0 && value[selEnd - 1] === '\n') effectiveEnd = selEnd - 1; // don't pull in the next line
   let lineEnd = value.indexOf('\n', effectiveEnd);
   if (lineEnd === -1) lineEnd = value.length;
 

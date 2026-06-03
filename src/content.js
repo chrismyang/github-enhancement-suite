@@ -22,6 +22,10 @@
     return !!(lb && (lb.offsetWidth || lb.offsetHeight));
   }
 
+  // execCommand is deprecated but intentional: on GitHub's React-controlled
+  // textareas it is the only mutation that fires the input event React listens
+  // for AND preserves the native single-step undo stack. (text === '' means
+  // "delete the selected range"; any non-empty text replaces the range.)
   function applyEdit(ta, r) {
     ta.setSelectionRange(r.rangeStart, r.rangeEnd);
     if (r.text === '') {
