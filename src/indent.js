@@ -16,6 +16,22 @@ function computeIndent(value, selStart, selEnd, opts) {
     };
   }
 
+  // Branch 2: collapsed caret + Shift-Tab -> strip up to INDENT_UNIT leading spaces
+  if (collapsed && dedent) {
+    const lineStart = value.lastIndexOf('\n', selStart - 1) + 1;
+    let i = 0;
+    while (i < INDENT_UNIT.length && value[lineStart + i] === ' ') i++;
+    if (i === 0) return null;
+    const caret = Math.max(lineStart, selStart - i);
+    return {
+      rangeStart: lineStart,
+      rangeEnd: lineStart + i,
+      text: '',
+      newSelStart: caret,
+      newSelEnd: caret,
+    };
+  }
+
   return null;
 }
 
