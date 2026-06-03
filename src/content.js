@@ -2,17 +2,26 @@
   const computeIndent = globalThis.GMTI && globalThis.GMTI.computeIndent;
   if (!computeIndent) return;
 
-  // Markdown editing textareas across the React UI and the classic UI.
+  // Known markdown editing textareas. The React "new issue" description carries
+  // aria-label="Markdown value", but the comment composer instead uses
+  // aria-labelledby — so we also match structurally below.
   const SELECTOR = [
-    'textarea[aria-label="Markdown value"]', // React UI: comments + descriptions
+    'textarea[aria-label="Markdown value"]', // React UI: issue/PR description
     'textarea.js-comment-field',             // classic comment box
     'textarea[name="issue[body]"]',          // classic issue description
     'textarea[name="pull_request[body]"]',   // classic PR description
     'textarea[name="comment[body]"]',        // classic comment variants
   ].join(',');
 
+  // The Primer React markdown editor (descriptions AND comments) wraps its
+  // textarea in a MarkdownEditor/MarkdownInput module container. Matching that
+  // wrapper catches both surfaces and is resilient to the per-build class hash
+  // on the textarea itself, while ignoring unrelated page textareas.
+  const WRAPPER_SELECTOR = '[class*="MarkdownEditor-module"], [class*="MarkdownInput-module"]';
+
   function isMarkdownField(el) {
-    return el instanceof HTMLTextAreaElement && el.matches(SELECTOR);
+    if (!(el instanceof HTMLTextAreaElement)) return false;
+    return el.matches(SELECTOR) || !!el.closest(WRAPPER_SELECTOR);
   }
 
   // Stand down while GitHub's @/#/: autocomplete popup is open.
