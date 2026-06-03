@@ -57,11 +57,35 @@ Dim the URL portion of a markdown link (and potentially other light syntax highl
 ## 5. List-aware semantic indent (fast-follow to v1)
 
 v1 indents by a uniform 2 spaces. Phase 2: detect list markers on the affected lines and
-indent/dedent by one *real* level — 2 spaces under `- `, 3 under `1. `, marker-width under
-ordered lists — with plain text capped so a double-indent can't accidentally create a
-4-space code block. Same pure `computeIndent` function, extended; still offset-preserving
-text manipulation (NOT a full markdown AST round-trip — see brainstorming notes / spec for
-why an AST reformats the whole document and loses the cursor).
+indent/dedent by one *real* level (= the parent marker's width), with plain text capped so a
+double-indent can't accidentally create a 4-space code block. Same pure `computeIndent`
+function, extended; still offset-preserving text manipulation (NOT a full markdown AST
+round-trip — see brainstorming notes / spec for why an AST reformats the whole document and
+loses the cursor).
+
+### The concrete indent rule (per official GitHub docs + empirically verified)
+
+GitHub's [Basic writing and formatting syntax](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax)
+("Nested Lists") does NOT mandate a fixed 2 or 4 spaces. It is an **alignment / character-count
+rule**: indent a nested item until its marker sits directly below the first character of the
+parent item's text — i.e. by the **width of the parent's marker**:
+
+| Parent marker | Chars before content | Spaces to nest one level |
+| ------------- | -------------------- | ------------------------ |
+| `- ` / `* `   | 2                    | **2**                    |
+| `1. `         | 3                    | **3**                    |
+| `100. `       | 5                    | **5** (docs' own example) |
+
+Verified live against GitHub's CommonMark renderer (Preview tab, 2026-06-03):
+- Bullet sublists nest correctly at 2 spaces/level (tested 3 levels deep).
+- A 3-space child nests under `1. `.
+- A **2-space child under `1. ` does NOT nest** — it breaks out into a separate top-level
+  list. This is the bug uniform-2-spaces will hit under numbered lists, and the reason this
+  feature is worth doing.
+
+So phase 2's indent amount must be derived from the enclosing list item's marker width, not a
+constant. **Blockquotes are out of scope for this rule** — they nest via stacked `>` markers
+(`>` then `> >`), not leading spaces, so Tab indentation does not apply to them.
 
 ## Other candidates (unprioritized)
 
