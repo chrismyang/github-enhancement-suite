@@ -32,7 +32,35 @@ function computeIndent(value, selStart, selEnd, opts) {
     };
   }
 
-  return null;
+  // Branch 3: non-collapsed selection -> line-mode indent/dedent of all touched lines
+  const lineStart = value.lastIndexOf('\n', selStart - 1) + 1;
+  let effectiveEnd = selEnd;
+  if (value[selEnd - 1] === '\n') effectiveEnd = selEnd - 1; // don't pull in the next line
+  let lineEnd = value.indexOf('\n', effectiveEnd);
+  if (lineEnd === -1) lineEnd = value.length;
+
+  const block = value.slice(lineStart, lineEnd);
+  const newBlock = block
+    .split('\n')
+    .map(function (line) {
+      if (dedent) {
+        let i = 0;
+        while (i < INDENT_UNIT.length && line[i] === ' ') i++;
+        return line.slice(i);
+      }
+      if (line.length === 0) return line; // never indent a blank line
+      return INDENT_UNIT + line;
+    })
+    .join('\n');
+
+  if (newBlock === block) return null;
+  return {
+    rangeStart: lineStart,
+    rangeEnd: lineEnd,
+    text: newBlock,
+    newSelStart: lineStart,
+    newSelEnd: lineStart + newBlock.length,
+  };
 }
 
 // Expose for the content script (shared isolated-world global) and for Node tests.

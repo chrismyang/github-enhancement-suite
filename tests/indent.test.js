@@ -50,3 +50,66 @@ test('Shift-Tab dedents the correct line in a multi-line value', () => {
     newSelEnd: 3,
   });
 });
+
+test('single fully-selected line indents', () => {
+  const r = computeIndent('abc', 0, 3, { dedent: false });
+  assert.deepStrictEqual(r, {
+    rangeStart: 0,
+    rangeEnd: 3,
+    text: '  abc',
+    newSelStart: 0,
+    newSelEnd: 5,
+  });
+});
+
+test('multi-line selection indents every line and selects the block', () => {
+  // "a\nb\nc", select "a\nb" (0..3)
+  const r = computeIndent('a\nb\nc', 0, 3, { dedent: false });
+  assert.deepStrictEqual(r, {
+    rangeStart: 0,
+    rangeEnd: 3,
+    text: '  a\n  b',
+    newSelStart: 0,
+    newSelEnd: 7,
+  });
+});
+
+test('selection ending exactly at a line start does not pull in the next line', () => {
+  // "a\nb\nc", select "a\n" (0..2) -> only line "a" is touched
+  const r = computeIndent('a\nb\nc', 0, 2, { dedent: false });
+  assert.deepStrictEqual(r, {
+    rangeStart: 0,
+    rangeEnd: 1,
+    text: '  a',
+    newSelStart: 0,
+    newSelEnd: 3,
+  });
+});
+
+test('blank lines within a selection are not indented', () => {
+  // "a\n\nb", select all (0..4)
+  const r = computeIndent('a\n\nb', 0, 4, { dedent: false });
+  assert.deepStrictEqual(r, {
+    rangeStart: 0,
+    rangeEnd: 4,
+    text: '  a\n\n  b',
+    newSelStart: 0,
+    newSelEnd: 8,
+  });
+});
+
+test('multi-line dedent strips each line, leaving already-flush lines untouched', () => {
+  // "  a\nb", select all (0..5)
+  const r = computeIndent('  a\nb', 0, 5, { dedent: true });
+  assert.deepStrictEqual(r, {
+    rangeStart: 0,
+    rangeEnd: 5,
+    text: 'a\nb',
+    newSelStart: 0,
+    newSelEnd: 3,
+  });
+});
+
+test('selection dedent with no removable leading space is a no-op (null)', () => {
+  assert.strictEqual(computeIndent('a\nb', 0, 3, { dedent: true }), null);
+});
