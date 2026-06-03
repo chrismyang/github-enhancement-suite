@@ -54,19 +54,21 @@ Dim the URL portion of a markdown link (and potentially other light syntax highl
   against the React layout. This is the CodeMirror-lite overlay technique.
 - Highest risk of breaking on GitHub UI changes. Treat as a later, opt-in phase.
 
-## Known unsupported surfaces
-
-- **Projects issue side-pane.** The extension does not trigger when editing a comment from
-  the Projects "issue pane" view, e.g.
-  `https://github.com/orgs/<org>/projects/<n>/views/<v>?pane=issue&itemId=…&issue=…`.
-  The content script matches `https://github.com/*` so it does inject on that page, but the
-  comment editor in the pane isn't being caught/handled — needs investigation (different
-  editor markup, an iframe/shadow boundary, or the pane's keydown handling intercepting Tab
-  before our capture-phase listener). Worth probing this surface's DOM the way we probed the
-  comment composer, then extending the selector / handling to cover it.
-
 ## Other candidates (unprioritized)
 
 - Configurable indent unit (2 spaces default vs. tabs vs. 4 spaces).
 - Auto-continue / smart handling of numbered lists and checkboxes.
 - Markdown table column alignment helper.
+- **Harden the autocomplete stand-down.** `autocompleteOpen()` in `content.js` falls back to a
+  global `document.querySelector('[role="listbox"]')` visibility check. On listbox-heavy pages
+  (e.g. Projects boards) a visible listbox unrelated to the comment editor could — if it is
+  first in DOM order — make Tab wrongly stand down and stop indenting. Scope the fallback to the
+  focused textarea's own popup (its `aria-controls`/`aria-owns` listbox) rather than any listbox
+  on the page; the primary `aria-expanded === 'true'` signal already covers the real
+  autocomplete.
+
+  _Note (verified 2026-06-03):_ the Projects issue side-pane
+  (`/orgs/<org>/projects/<n>/views/<v>?pane=issue`) **does** work — its comment editor is in the
+  top-document light DOM and matches our `MarkdownEditor`-wrapper selector, so the wrapper fix
+  (commit `cf60728`) already covers it. It is no longer an unsupported surface; the listbox
+  fragility above is the only residual issue found there.
