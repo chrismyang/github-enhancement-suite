@@ -1,0 +1,9 @@
+# Playwright MCP session artifacts (snapshots, console logs)
+.playwright-mcp/
+
+# Dependencies (none currently; tests use Node's built-in runner)
+node_modules/
+
+# OS / editor cruft
+.DS_Store
+*.swp
