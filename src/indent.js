@@ -94,7 +94,15 @@ function computeSoftBreak(value, selStart, selEnd) {
 function computeListEnter(value, selStart, selEnd) {
   if (selStart !== selEnd) return null;
   const { lineStart, line } = lineBounds(value, selStart);
-  if (listMarker(line)) return null; // marker line: GitHub's native Enter auto-continues
+  const lm = listMarker(line);
+  if (lm) {
+    // Caret at or before the marker start (in the leading indent, left of the marker) is
+    // not inside the item's content: insert a plain newline and block GitHub's native list
+    // auto-continuation. Caret in the marker/content -> null, so GitHub auto-continues.
+    if (selStart - lineStart > lm.indent) return null;
+    const caret = selStart + 1;
+    return { rangeStart: selStart, rangeEnd: selStart, text: '\n', newSelStart: caret, newSelEnd: caret };
+  }
   const indent = line.length - line.replace(/^ +/, '').length;
   if (indent === 0) return null; // not an indented continuation
   if (line.trim() === '') return null; // empty continuation: native bare newline (exit)

@@ -21,18 +21,6 @@ selection wrapping with surrounding characters.
 
 ---
 
-## Bug: Enter with caret before the list marker should insert a plain newline
-
-When the caret is positioned before the list item's marker (i.e. in or at the start of the leading indent, left of
-the -  / 1.  marker), pressing Enter currently produces a new list-item line. It should instead insert a normal
-newline — the caret isn't inside the item's content, so there's no item to continue.
-
-- Likely lives in the Enter path (computeListEnter in src/indent.js / the plain-Enter branch in src/content.js).
-- Repro: click just left of the - on a   - item line and hit Enter.
-- Expected: a bare newline (native behavior). Actual: a new bullet/n+1 item is started.
-- Fix sketch: when the caret column is <= listMarker(line).indent (at or before the marker start),
-computeListEnter should return null so GitHub's native Enter runs.
-
 ## 1. Grey-out link URLs (light syntax styling)
 
 Dim the URL portion of a markdown link (and potentially other light syntax highlighting).

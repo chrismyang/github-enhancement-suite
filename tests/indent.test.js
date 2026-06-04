@@ -378,6 +378,29 @@ test('computeListEnter returns null on a marker line (native auto-continue)', ()
   assert.strictEqual(computeListEnter('- foo', 5, 5), null);
 });
 
+test('computeListEnter inserts a plain newline when the caret is before the marker', () => {
+  // caret at column 0 of "- foo": left of the marker -> bare newline, not auto-continue
+  const r = computeListEnter('- foo', 0, 0);
+  assert.deepStrictEqual(r, { rangeStart: 0, rangeEnd: 0, text: '\n', newSelStart: 1, newSelEnd: 1 });
+});
+
+test('computeListEnter inserts a plain newline in the leading indent of an indented item', () => {
+  // "  - foo": indent 2; caret at column 1 (inside the leading spaces)
+  const r = computeListEnter('  - foo', 1, 1);
+  assert.deepStrictEqual(r, { rangeStart: 1, rangeEnd: 1, text: '\n', newSelStart: 2, newSelEnd: 2 });
+});
+
+test('computeListEnter inserts a plain newline with caret exactly at the marker start', () => {
+  // "  - foo": caret at column 2 (== indent), right before the "-"
+  const r = computeListEnter('  - foo', 2, 2);
+  assert.deepStrictEqual(r, { rangeStart: 2, rangeEnd: 2, text: '\n', newSelStart: 3, newSelEnd: 3 });
+});
+
+test('computeListEnter returns null with caret inside the marker (just past indent)', () => {
+  // "  - foo": caret at column 3 (after "-"), inside the marker -> native auto-continue
+  assert.strictEqual(computeListEnter('  - foo', 3, 3), null);
+});
+
 test('computeListEnter returns null on a non-indented line', () => {
   assert.strictEqual(computeListEnter('foo', 3, 3), null);
 });
