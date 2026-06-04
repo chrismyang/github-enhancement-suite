@@ -75,6 +75,24 @@ Stay consistent with the codebase: **pure logic in `src/indent.js`, DOM glue onl
 
 ### `src/indent.js`
 
+**Preliminary refactor (code-quality, behavior-identical).** `computeIndent` has grown to ~107
+lines covering four branches (caret/selection × list/non-list × indent/dedent), and two idioms
+are duplicated across the module. Before adding the wrap logic, decompose it — guarded by the
+existing unit suite (a pure refactor must keep every current test green):
+
+- `lineBounds(value, pos)` → `{ lineStart, lineEnd, line }` — the "current line" idiom repeated
+  in `computeSoftBreak`, `computeListEnter`, `computePasteIndent`, and `computeIndent`. Adopt it
+  in all four.
+- `listIndentDelta(value, lineStart, lm, dedent)` → signed indent delta — the
+  preceding-content-column math currently duplicated between the caret-list and selection-list
+  branches (selection mode takes its magnitude via `Math.abs`).
+- `caretIndentEdit(...)` and `selectionIndentEdit(...)` — the two halves of the function, leaving
+  `computeIndent` a small dispatcher on `selStart === selEnd`.
+- Export the two reusable pure helpers (`lineBounds`, `listIndentDelta`) on `GMTI` +
+  `module.exports`, matching the existing helper exports; the two edit-builders stay internal.
+
+Then add the wrap logic:
+
 - Add a `WRAP_PAIRS` table mapping each trigger key to `{ open, close }`.
 - Add a pure `computeWrap(value, selStart, selEnd, ch)` returning the standard edit contract
   `{ rangeStart, rangeEnd, text, newSelStart, newSelEnd } | null`:
