@@ -6,8 +6,8 @@ _Spec date: 2026-06-04_
 
 Add a search overlay, opened with **`Ctrl+;`** from inside any GitHub markdown textarea, that
 lets you find an issue with the **full `github.com/search` engine** (free text + all
-qualifiers) and insert a reference (`owner/repo#123`) at the caret. **MVP is issues only**
-(searching pull requests is a deferred follow-up — see Scope). It exists because GitHub's
+qualifiers) and insert a reference (`owner/repo#123`) at the caret. The query box defaults to
+issues; PRs are reachable by editing it (see Scope). It exists because GitHub's
 native `#` autocomplete has weak recall/ranking and no qualifier support, so finding the right
 issue while composing a comment is painful relative to `github.com/search`.
 
@@ -39,9 +39,12 @@ Verified live on real GitHub (2026-06-04):
   `<em>` match highlights), `hl_text` (body snippet), `repo.repository.owner_login` +
   `repo.repository.name`, `labels`, `num_comments`, `author_name`, `created`, and
   `issue.issue.pull_request_id` (null ⇒ issue).
-- `type=issues` returns **issues only**; `type=pullrequests` returns **PRs only** (both 200, both
-  parse identically). **MVP fetches `type=issues` only** — a single request. Adding PRs later is
-  just a second `type=pullrequests` fetch plus a merge (deferred — see Scope).
+- **Query syntax (confirmed live):** the fetch URL **must** include a `type` param — with none,
+  `/search` defaults to *repository* search (0 issue results). With `&type=issues` set (which
+  engages GitHub's issue/PR search index), the **`is:` qualifier in `q` drives the result kind**:
+  `is:issue` → issues, `is:pr` → PRs (verified: `type=issues` + `is:pr` returned PRs). So one
+  fixed `&type=issues` URL switch plus the user's query text covers both kinds — single request,
+  no merge.
 
 **Chosen backend: the same-origin scrape (no token).** It reuses the existing login with zero
 setup, which is preferred for a personal, load-unpacked extension. The cost is parsing an
@@ -56,12 +59,14 @@ replacement.
 
 - **Trigger:** `Ctrl+;` while focused in a markdown field opens the overlay. The native
   `@`/`#`/`:` autocompletes and all other typing are unaffected.
-- **Default scope:** a hardcoded `DEFAULT_SCOPE = 'org:dragonflyic'` is prepended to the user's
-  free text, *unless* the text already contains a scoping qualifier (`org:`, `repo:`, `user:`,
-  or `owner:`), in which case the text is used as-is (lets the user broaden/redirect).
-- **Search:** the user types a full query and presses **Enter** to run it (NOT debounced
-  as-you-type). On Enter, a single same-origin fetch (`type=issues`); results parsed and listed
-  with the first row auto-highlighted.
+- **Pre-filled, editable query (self-describing):** the overlay input opens **pre-filled** with
+  `DEFAULT_QUERY = 'org:dragonflyic is:issue '` (caret at end). The user appends their terms and
+  can edit the prefix for a one-off — different `org:`/`repo:`, or `is:pr` to find a PR instead.
+  The box content **is** the query; there's no hidden prepend or qualifier-guessing.
+- **Search:** the user presses **Enter** to run the box's current text (NOT debounced
+  as-you-type). On Enter, a single same-origin fetch to `/search?q=<box>&type=issues` — the fixed
+  `type=issues` switch engages the issue/PR index and the box's `is:` qualifier selects the kind.
+  Results parsed and listed with the first row auto-highlighted.
 - **Result row:** state (open / closed), plain-text title, and `repo#number`.
 - **Enter semantics (two stages):** while the input has focus and the query is unchanged since
   the last run, Enter inserts the highlighted result; editing the query makes Enter re-run the
@@ -80,9 +85,10 @@ Preserves the repo's split: **pure logic in a testable module, DOM/network in gl
 
 Exposed on `globalThis.GMTI` and `module.exports`, matching the project pattern.
 
-- `const DEFAULT_SCOPE = 'org:dragonflyic';`
-- `buildQuery(rawText, defaultScope)` → `string`. If `/\b(org|repo|user|owner):/i.test(rawText)`
-  return `rawText.trim()`; else return `` `${defaultScope} ${rawText.trim()}` ``.
+- `const DEFAULT_QUERY = 'org:dragonflyic is:issue ';` — the initial (editable) box content.
+- `searchUrl(queryText)` → `` `/search?q=${encodeURIComponent(queryText.trim())}&type=issues` ``.
+  (`type=issues` is the fixed switch that engages the issue/PR index; the query text — incl. any
+  `is:issue`/`is:pr` — does the filtering.)
 - `parseResultsHtml(htmlString)` → `Array<Result>`. Extracts the `react-app.embeddedData`
   script's JSON **by string match (NOT DOMParser, so it runs under node:test)**, `JSON.parse`s
   it, maps `payload.results` to the normalized shape below. Any failure (no blob, bad JSON,
@@ -96,10 +102,11 @@ Normalized `Result`: `{ number, owner, repo, title, state }` (issues only in the
 ### `src/issue-search-ui.js` — glue (DOM + network)
 
 - Creates/owns the overlay element (search input + results `<ul>`), positioned anchored to the
-  focused textarea (below it for MVP — not caret-pixel precise).
-- Enter-run search: on Enter in the input, builds the query via `buildQuery`, fetches
-  `type=issues` same-origin with `credentials: 'same-origin'`, calls `parseResultsHtml`, renders
-  rows, auto-highlights the first. No debounce / no as-you-type requests.
+  focused textarea (below it for MVP — not caret-pixel precise). The input opens **pre-filled
+  with `DEFAULT_QUERY`**, caret at end, so the scope/qualifiers are visible and editable.
+- Enter-run search: on Enter in the input, fetches `searchUrl(input.value)` same-origin with
+  `credentials: 'same-origin'`, calls `parseResultsHtml`, renders rows, auto-highlights the
+  first. No debounce / no as-you-type requests.
 - Keyboard nav inside the overlay: Up/Down move the highlight; Enter inserts the highlighted
   result (or re-runs the search if the query changed since the last run); Escape cancels.
 - On choose: invokes a callback with `buildReference(result)`; on cancel/blur: closes and
@@ -139,8 +146,7 @@ Normalized `Result`: `{ number, owner, repo, title, state }` (issues only in the
 Against a saved **HTML fixture** (a real `/search?...&type=issues` response trimmed to a couple
 of results):
 
-- `buildQuery`: prepends `DEFAULT_SCOPE`; leaves text untouched when it already has
-  `org:`/`repo:`/`user:`/`owner:`; trims.
+- `searchUrl`: trims and URL-encodes the query text and appends `&type=issues`.
 - `parseResultsHtml`: extracts results from the fixture with correct
   `number/owner/repo/title/state`; returns `[]` for empty HTML, malformed JSON, and a missing
   `embeddedData` blob.
@@ -157,11 +163,13 @@ into logs.
 
 ## Scope
 
-**MVP (this spec):** `Ctrl+;` trigger → type query → **Enter-run** single `type=issues` search →
-list with plain-text titles → arrow + Enter inserts `owner/repo#123`. Overlay anchored under the
-textarea.
+**MVP (this spec):** `Ctrl+;` trigger → overlay opens with the **pre-filled, editable** query
+`org:dragonflyic is:issue ` → **Enter-run** search (`/search?q=<box>&type=issues`) → list with
+plain-text titles → arrow + Enter inserts `owner/repo#123`. Defaults to issues; editing the box to
+`is:pr` finds PRs via the same single fetch. Overlay anchored under the textarea.
 
-**Deferred polish (not now):** **searching pull requests too** (a second `type=pullrequests`
-fetch + merge, with an issue-vs-PR icon and merged-state); safe `<em>` highlight rendering; exact
-caret-pixel positioning; collapsing same-repo references to bare `#123`; recency-vs-relevance sort
-tuning; a `;;` text trigger in addition to the chord; a runtime-configurable scope (options page).
+**Deferred polish (not now):** **issues + PRs merged into one list** (the box already *reaches*
+PRs via `is:pr`, but showing both kinds at once would need a second fetch + merge with issue-vs-PR
+icons and merged-state); safe `<em>` highlight rendering; exact caret-pixel positioning; collapsing
+same-repo references to bare `#123`; recency-vs-relevance sort tuning; a `;;` text trigger in
+addition to the chord; a runtime-configurable scope (options page).
