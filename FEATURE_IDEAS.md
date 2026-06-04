@@ -4,7 +4,8 @@ Backlog for the GitHub markdown editing enhancement extension. Each note include
 from the live DOM probes (2026-06-03) so we don't re-investigate later.
 
 **Already shipped:** Tab/Shift-Tab list-aware indent (v1 + v2), Shift+Enter in-item
-continuation + Enter-to-new-item, monospace editor font, and multi-line paste re-indent.
+continuation + Enter-to-new-item, monospace editor font, multi-line paste re-indent, and
+selection wrapping with surrounding characters.
 
 ## Probe findings that apply to everything here
 
@@ -20,15 +21,19 @@ continuation + Enter-to-new-item, monospace editor font, and multi-line paste re
 
 ---
 
-## 1. Wrap selection with surrounding characters
+## Bug: Enter with caret before the list marker should insert a plain newline
 
-Selecting a text range and typing a surrounding character sequence (e.g. `~~` strikethrough,
-`(` parens, `*`, `` ` ``) should **wrap** the selection rather than replace it.
+When the caret is positioned before the list item's marker (i.e. in or at the start of the leading indent, left of
+the -  / 1.  marker), pressing Enter currently produces a new list-item line. It should instead insert a normal
+newline — the caret isn't inside the item's content, so there's no item to continue.
 
-- Builds directly on the same selection + `execCommand` engine as Tab indent.
-- Natural companion to the indent work; good early follow-up.
+- Likely lives in the Enter path (computeListEnter in src/indent.js / the plain-Enter branch in src/content.js).
+- Repro: click just left of the - on a   - item line and hit Enter.
+- Expected: a bare newline (native behavior). Actual: a new bullet/n+1 item is started.
+- Fix sketch: when the caret column is <= listMarker(line).indent (at or before the marker start),
+computeListEnter should return null so GitHub's native Enter runs.
 
-## 2. Grey-out link URLs (light syntax styling)
+## 1. Grey-out link URLs (light syntax styling)
 
 Dim the URL portion of a markdown link (and potentially other light syntax highlighting).
 
@@ -56,3 +61,6 @@ Dim the URL portion of a markdown link (and potentially other light syntax highl
   top-document light DOM and matches our `MarkdownEditor`-wrapper selector, so the wrapper fix
   (commit `cf60728`) already covers it. It is no longer an unsupported surface; the listbox
   fragility above is the only residual issue found there.
+- Keyboard shorcuts for common operators
+  - Toggle preview/edit mode
+  - Toggle edit / view mode (not sure how it'll "select" which comment/description I'm referring to though)

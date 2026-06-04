@@ -14,18 +14,9 @@ Private repo: `chrismyang/github-enhancement-suite`. Distribution is **load-unpa
 build step, no bundler, no dependencies).
 
 ### Shipped behaviors
-- **Tab / Shift-Tab**: list-aware indent/dedent of the current line or selection (marker-width
-  aware: 2 under `- `, 3 under `1. `; aligns under the parent for mixed lists; never skips
-  levels). Non-list lines get a plain 2-space insert/strip at the caret.
-- **Shift+Enter** inside a list item: soft line break aligned to the item's content column
-  (repeatable — multi-line blocks stay in the item).
-- **Enter** on a markerless continuation line: starts a new sibling list item (bullet, or
-  ordered `n+1`). Marker-line Enter and non-list Enter stay native (GitHub auto-continues).
-- **Monospace font** in the editing textarea (always on, CSS only).
-- **Paste**: a multi-line *plain-text* paste into a list item is re-indented to the item's
-  content column. Images, rich/HTML pastes, single-line, and non-list pastes defer to GitHub.
-
-Backlog and probe findings live in `FEATURE_IDEAS.md`.
+Each shipped feature has a dated design doc in `docs/superpowers/specs/` (and an implementation
+plan in `docs/superpowers/plans/`); read those for the authoritative spec of current behavior
+rather than duplicating it here. Backlog and probe findings live in `FEATURE_IDEAS.md`.
 
 ## Layout
 
@@ -99,7 +90,8 @@ Playwright MCP browser, driving the actual loaded extension. Pattern used throug
 This repo is built with the **superpowers** skills, one feature at a time:
 brainstorm → write spec (`docs/superpowers/specs/`) → write plan (`docs/superpowers/plans/`) →
 implement plan task-by-task with TDD and per-task spec+quality review → live-verify on real
-GitHub → **squash the feature's commits into one** and push to keep `origin/main` tidy.
+GitHub → **squash the feature's commits into one** and push to keep `origin/main` tidy. When
+wrapping up, **true up `FEATURE_IDEAS.md`**: remove the now-shipped idea from the backlog.
 
 Plans contain exact, verbatim code per task — implement it as written (don't "improve" regexes
 etc.; deviations have caused bugs). Commit messages end with the project's Co-Authored-By line.
