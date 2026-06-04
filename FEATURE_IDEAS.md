@@ -56,6 +56,14 @@ Dim the URL portion of a markdown link (and potentially other light syntax highl
 
 ## Other candidates (unprioritized)
 
+- **Paste multi-line text as implicit soft-breaks (Google-Docs style).** When pasting multi-line
+  plain text while the caret is in a list item, re-indent the pasted lines to the item's content
+  column so the whole block stays in the item (analogous to the Shift+Enter soft break). Deferred
+  from the Shift+Enter push (2026-06-03) due to high interaction risk with GitHub's native paste:
+  it converts pasted rich text/HTML to markdown (`js-paste-markdown`), uploads pasted images, and
+  turns a pasted URL over a selection into a link. Must scope narrowly — intercept ONLY when the
+  clipboard is multi-line *plain* text with no files/HTML and the caret is in a list/indented
+  context; let everything else fall through to GitHub.
 - Configurable indent unit (2 spaces default vs. tabs vs. 4 spaces).
 - Auto-continue / smart handling of numbered lists and checkboxes.
 - Markdown table column alignment helper.

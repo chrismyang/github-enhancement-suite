@@ -22,6 +22,59 @@ function precedingListContentCols(value, lineStart) {
   return cols;
 }
 
+function nextMarker(line) {
+  const m = /^ *([-*+]|(\d+)([.)]))( +)/.exec(line);
+  if (!m) return null;
+  if (m[2]) return (parseInt(m[2], 10) + 1) + m[3] + ' ';
+  return m[1] + ' ';
+}
+
+function owningListLine(value, lineStart, indent) {
+  let end = lineStart - 1; // index of the '\n' ending the previous line, or -1
+  while (end >= 0) {
+    const prevStart = value.lastIndexOf('\n', end - 1) + 1;
+    const prevLine = value.slice(prevStart, end);
+    const lm = listMarker(prevLine);
+    if (lm) return lm.contentCol === indent ? prevLine : null;
+    // markerless line: a deeper/equal non-blank line is a continuation -> keep scanning
+    const lead = prevLine.length - prevLine.replace(/^ +/, '').length;
+    if (prevLine.trim() !== '' && lead >= indent) { end = prevStart - 1; continue; }
+    return null; // blank line or a shallower line ends the item's continuation block
+  }
+  return null;
+}
+
+function computeSoftBreak(value, selStart, selEnd) {
+  if (selStart !== selEnd) return null;
+  const lineStart = value.lastIndexOf('\n', selStart - 1) + 1;
+  let lineEnd = value.indexOf('\n', selStart);
+  if (lineEnd === -1) lineEnd = value.length;
+  const line = value.slice(lineStart, lineEnd);
+  const lm = listMarker(line);
+  const prefixLen = lm ? lm.contentCol : line.length - line.replace(/^ +/, '').length;
+  if (prefixLen === 0) return null;
+  const text = '\n' + ' '.repeat(prefixLen);
+  const caret = selStart + text.length;
+  return { rangeStart: selStart, rangeEnd: selStart, text, newSelStart: caret, newSelEnd: caret };
+}
+
+function computeListEnter(value, selStart, selEnd) {
+  if (selStart !== selEnd) return null;
+  const lineStart = value.lastIndexOf('\n', selStart - 1) + 1;
+  let lineEnd = value.indexOf('\n', selStart);
+  if (lineEnd === -1) lineEnd = value.length;
+  const line = value.slice(lineStart, lineEnd);
+  if (listMarker(line)) return null; // marker line: GitHub's native Enter auto-continues
+  const indent = line.length - line.replace(/^ +/, '').length;
+  if (indent === 0) return null; // not an indented continuation
+  if (line.trim() === '') return null; // empty continuation: native bare newline (exit)
+  const ownerLine = owningListLine(value, lineStart, indent);
+  if (!ownerLine) return null;
+  const text = '\n' + ' '.repeat(listMarker(ownerLine).indent) + nextMarker(ownerLine);
+  const caret = selStart + text.length;
+  return { rangeStart: selStart, rangeEnd: selStart, text, newSelStart: caret, newSelEnd: caret };
+}
+
 function computeIndent(value, selStart, selEnd, opts) {
   const dedent = !!(opts && opts.dedent);
   const collapsed = selStart === selEnd;
@@ -138,7 +191,11 @@ if (typeof globalThis !== 'undefined') {
   globalThis.GMTI.INDENT_UNIT = INDENT_UNIT;
   globalThis.GMTI.listMarker = listMarker;
   globalThis.GMTI.precedingListContentCols = precedingListContentCols;
+  globalThis.GMTI.nextMarker = nextMarker;
+  globalThis.GMTI.owningListLine = owningListLine;
+  globalThis.GMTI.computeSoftBreak = computeSoftBreak;
+  globalThis.GMTI.computeListEnter = computeListEnter;
 }
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { computeIndent, INDENT_UNIT, listMarker, precedingListContentCols };
+  module.exports = { computeIndent, INDENT_UNIT, listMarker, precedingListContentCols, nextMarker, owningListLine, computeSoftBreak, computeListEnter };
 }

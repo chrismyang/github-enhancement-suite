@@ -264,3 +264,134 @@ test('list Tab: caret mid-line still indents the whole line and tracks the caret
   const r = computeIndent('- abc', 4, 4, { dedent: false });
   assert.deepStrictEqual(r, { rangeStart: 0, rangeEnd: 0, text: '  ', newSelStart: 6, newSelEnd: 6 });
 });
+
+const { nextMarker } = require('../src/indent.js');
+
+test('nextMarker returns the same bullet for unordered markers', () => {
+  assert.strictEqual(nextMarker('- a'), '- ');
+  assert.strictEqual(nextMarker('* a'), '* ');
+  assert.strictEqual(nextMarker('+ a'), '+ ');
+});
+
+test('nextMarker increments ordered markers and keeps the delimiter', () => {
+  assert.strictEqual(nextMarker('1. a'), '2. ');
+  assert.strictEqual(nextMarker('9) a'), '10) ');
+  assert.strictEqual(nextMarker('10. a'), '11. ');
+});
+
+test('nextMarker ignores leading indent and returns only the marker', () => {
+  assert.strictEqual(nextMarker('  - a'), '- ');
+  assert.strictEqual(nextMarker('   1. a'), '2. ');
+});
+
+test('nextMarker returns null for non-list lines', () => {
+  assert.strictEqual(nextMarker('hello'), null);
+  assert.strictEqual(nextMarker(''), null);
+});
+
+const { owningListLine } = require('../src/indent.js');
+
+test('owningListLine finds the direct parent of a continuation line', () => {
+  assert.strictEqual(owningListLine('- foo\n  bar', 6, 2), '- foo');
+});
+
+test('owningListLine scans past intervening continuation lines', () => {
+  const value = '- foo\n  bar\n  baz';
+  assert.strictEqual(value.slice(12), '  baz');
+  assert.strictEqual(owningListLine(value, 12, 2), '- foo');
+});
+
+test('owningListLine returns null across a blank line', () => {
+  assert.strictEqual(owningListLine('- foo\n\n  bar', 7, 2), null);
+});
+
+test('owningListLine returns null when the line above is not a list', () => {
+  assert.strictEqual(owningListLine('text\n  bar', 5, 2), null);
+});
+
+test('owningListLine returns null when indent does not match the parent content column', () => {
+  assert.strictEqual(owningListLine('- foo\n   bar', 6, 3), null);
+});
+
+test('owningListLine returns null when nothing precedes the line', () => {
+  assert.strictEqual(owningListLine('  bar', 0, 2), null);
+});
+
+const { computeSoftBreak } = require('../src/indent.js');
+
+test('computeSoftBreak aligns a bullet item continuation to the content column (2)', () => {
+  const r = computeSoftBreak('- foo', 5, 5);
+  assert.deepStrictEqual(r, { rangeStart: 5, rangeEnd: 5, text: '\n  ', newSelStart: 8, newSelEnd: 8 });
+});
+
+test('computeSoftBreak aligns an ordered item continuation (3)', () => {
+  const r = computeSoftBreak('1. foo', 6, 6);
+  assert.deepStrictEqual(r, { rangeStart: 6, rangeEnd: 6, text: '\n   ', newSelStart: 10, newSelEnd: 10 });
+});
+
+test('computeSoftBreak aligns a nested item continuation (4)', () => {
+  const r = computeSoftBreak('  - foo', 7, 7);
+  assert.deepStrictEqual(r, { rangeStart: 7, rangeEnd: 7, text: '\n    ', newSelStart: 12, newSelEnd: 12 });
+});
+
+test('computeSoftBreak repeats on a continuation line (matches its indent)', () => {
+  const r = computeSoftBreak('- foo\n  ', 8, 8);
+  assert.deepStrictEqual(r, { rangeStart: 8, rangeEnd: 8, text: '\n  ', newSelStart: 11, newSelEnd: 11 });
+});
+
+test('computeSoftBreak splits at a mid-line caret', () => {
+  const r = computeSoftBreak('- foobar', 5, 5);
+  assert.deepStrictEqual(r, { rangeStart: 5, rangeEnd: 5, text: '\n  ', newSelStart: 8, newSelEnd: 8 });
+});
+
+test('computeSoftBreak treats a task item like a bullet (content column 2)', () => {
+  const r = computeSoftBreak('- [ ] x', 7, 7);
+  assert.deepStrictEqual(r, { rangeStart: 7, rangeEnd: 7, text: '\n  ', newSelStart: 10, newSelEnd: 10 });
+});
+
+test('computeSoftBreak returns null on a plain non-indented line', () => {
+  assert.strictEqual(computeSoftBreak('hello', 5, 5), null);
+});
+
+test('computeSoftBreak returns null for a selection', () => {
+  assert.strictEqual(computeSoftBreak('- foo', 0, 5), null);
+});
+
+const { computeListEnter } = require('../src/indent.js');
+
+test('computeListEnter starts a new bullet from a continuation line', () => {
+  const r = computeListEnter('- foo\n  bar', 11, 11);
+  assert.deepStrictEqual(r, { rangeStart: 11, rangeEnd: 11, text: '\n- ', newSelStart: 14, newSelEnd: 14 });
+});
+
+test('computeListEnter increments an ordered marker from a continuation line', () => {
+  const r = computeListEnter('1. a\n   b', 9, 9);
+  assert.deepStrictEqual(r, { rangeStart: 9, rangeEnd: 9, text: '\n2. ', newSelStart: 13, newSelEnd: 13 });
+});
+
+test('computeListEnter starts a nested sibling at the owner indent', () => {
+  const value = '  - foo\n    baz';
+  assert.strictEqual(value.slice(8), '    baz');
+  const r = computeListEnter(value, 15, 15);
+  assert.deepStrictEqual(r, { rangeStart: 15, rangeEnd: 15, text: '\n  - ', newSelStart: 20, newSelEnd: 20 });
+});
+
+test('computeListEnter returns null on a marker line (native auto-continue)', () => {
+  assert.strictEqual(computeListEnter('- foo', 5, 5), null);
+});
+
+test('computeListEnter returns null on a non-indented line', () => {
+  assert.strictEqual(computeListEnter('foo', 3, 3), null);
+});
+
+test('computeListEnter returns null on a whitespace-only continuation line', () => {
+  assert.strictEqual(computeListEnter('- foo\n  ', 8, 8), null);
+});
+
+test('computeListEnter returns null when there is no owning list item', () => {
+  assert.strictEqual(computeListEnter('text\n  bar', 10, 10), null);
+});
+
+test('computeListEnter returns null for a selection', () => {
+  assert.strictEqual(computeListEnter('- foo\n  bar', 0, 11), null);
+});

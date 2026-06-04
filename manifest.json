@@ -2,11 +2,12 @@
   "manifest_version": 3,
   "name": "GitHub Markdown Tab Indent",
   "version": "1.0.0",
-  "description": "Tab / Shift-Tab indent and dedent in GitHub markdown textareas.",
+  "description": "Better editing for GitHub markdown textareas: Tab/Shift-Tab list-aware indent, Shift+Enter in-item continuation, Enter to start a new item, and a monospace editor font.",
   "content_scripts": [
     {
       "matches": ["https://github.com/*"],
       "js": ["src/indent.js", "src/content.js"],
+      "css": ["src/editor.css"],
       "run_at": "document_idle"
     }
   ]

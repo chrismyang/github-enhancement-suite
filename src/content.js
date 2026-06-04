@@ -1,6 +1,7 @@
 (function () {
-  const computeIndent = globalThis.GMTI && globalThis.GMTI.computeIndent;
-  if (!computeIndent) return;
+  const GMTI = globalThis.GMTI;
+  if (!GMTI || !GMTI.computeIndent) return;
+  const { computeIndent, computeSoftBreak, computeListEnter } = GMTI;
 
   // Known markdown editing textareas. The React "new issue" description carries
   // aria-label="Markdown value", but the comment composer instead uses
@@ -48,31 +49,44 @@
   document.addEventListener(
     'keydown',
     function (e) {
-      if (e.key !== 'Tab' || e.altKey || e.ctrlKey || e.metaKey) return;
+      if (e.ctrlKey || e.altKey || e.metaKey) return; // leave Ctrl/⌘+Enter (submit) etc. alone
+      const isTab = e.key === 'Tab';
+      const isShiftEnter = e.key === 'Enter' && e.shiftKey;
+      const isPlainEnter = e.key === 'Enter' && !e.shiftKey;
+      if (!isTab && !isShiftEnter && !isPlainEnter) return;
+
       const ta = e.target;
       if (!isMarkdownField(ta)) return;
       if (autocompleteOpen(ta)) return;
 
+      if (isTab) {
+        let r;
+        try {
+          r = computeIndent(ta.value, ta.selectionStart, ta.selectionEnd, { dedent: e.shiftKey });
+        } catch (err) {
+          return; // unexpected failure -> native behavior
+        }
+        // We own Tab: swallow it so focus never blurs, even on a no-op.
+        e.preventDefault();
+        e.stopPropagation();
+        if (!r) return;
+        try { applyEdit(ta, r); } catch (err) { /* never break the box */ }
+        return;
+      }
+
+      // Shift+Enter (soft break) or plain Enter (continuation -> new item).
       let r;
       try {
-        r = computeIndent(ta.value, ta.selectionStart, ta.selectionEnd, {
-          dedent: e.shiftKey,
-        });
+        r = isShiftEnter
+          ? computeSoftBreak(ta.value, ta.selectionStart, ta.selectionEnd)
+          : computeListEnter(ta.value, ta.selectionStart, ta.selectionEnd);
       } catch (err) {
-        return; // unexpected failure -> let native behavior happen (safety)
+        return; // native behavior
       }
-
-      // We own Tab for this field now: swallow it so focus never blurs,
-      // even for a computed no-op (e.g. Shift-Tab at column 0).
+      if (!r) return; // not our case -> let GitHub's native Enter/newline run
       e.preventDefault();
       e.stopPropagation();
-      if (!r) return;
-
-      try {
-        applyEdit(ta, r);
-      } catch (err) {
-        /* swallow: never break the box */
-      }
+      try { applyEdit(ta, r); } catch (err) { /* never break the box */ }
     },
     true // capture phase
   );

@@ -1,0 +1,10 @@
+/* Render GitHub markdown editing textareas in a monospace font (editing view only). */
+textarea[aria-label="Markdown value"],
+textarea.js-comment-field,
+textarea[name="issue[body]"],
+textarea[name="pull_request[body]"],
+textarea[name="comment[body]"],
+[class*="MarkdownEditor-module"] textarea,
+[class*="MarkdownInput-module"] textarea {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace !important;
+}
