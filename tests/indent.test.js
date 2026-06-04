@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { computeIndent } = require('../src/indent.js');
+const { computeIndent, lineBounds, listIndentDelta, listMarker, computeWrap } = require('../src/indent.js');
 
 test('collapsed caret + Tab inserts 2 spaces at the caret', () => {
   const r = computeIndent('ab', 1, 1, { dedent: false });
@@ -113,8 +113,6 @@ test('multi-line dedent strips each line, leaving already-flush lines untouched'
 test('selection dedent with no removable leading space is a no-op (null)', () => {
   assert.strictEqual(computeIndent('a\nb', 0, 3, { dedent: true }), null);
 });
-
-const { listMarker } = require('../src/indent.js');
 
 test('listMarker parses a bullet item', () => {
   assert.deepStrictEqual(listMarker('- a'), { indent: 0, markerWidth: 2, contentCol: 2 });
@@ -429,4 +427,99 @@ test('computePasteIndent returns null for a single-line paste', () => {
 
 test('computePasteIndent returns null on a non-list, non-indented line', () => {
   assert.strictEqual(computePasteIndent('hello', 5, 5, 'a\nb'), null);
+});
+
+test('lineBounds returns the bounds and text of the line containing pos', () => {
+  assert.deepStrictEqual(lineBounds('ab\ncd\nef', 4), { lineStart: 3, lineEnd: 5, line: 'cd' });
+});
+
+test('lineBounds handles the first line (pos 0)', () => {
+  assert.deepStrictEqual(lineBounds('ab\ncd', 0), { lineStart: 0, lineEnd: 2, line: 'ab' });
+});
+
+test('lineBounds handles the last line with no trailing newline', () => {
+  assert.deepStrictEqual(lineBounds('ab\ncd', 5), { lineStart: 3, lineEnd: 5, line: 'cd' });
+});
+
+test('lineBounds with pos exactly on a newline belongs to the line ending there', () => {
+  // pos 2 is the '\n' in 'ab\ncd'; that character terminates line "ab"
+  assert.deepStrictEqual(lineBounds('ab\ncd', 2), { lineStart: 0, lineEnd: 2, line: 'ab' });
+});
+
+test('listIndentDelta nests a lone top-level item by its marker width', () => {
+  const value = '- a';
+  assert.strictEqual(listIndentDelta(value, 0, listMarker('- a'), false), 2);
+});
+
+test('listIndentDelta dedent at column 0 is a no-op (0)', () => {
+  const value = '- a';
+  assert.strictEqual(listIndentDelta(value, 0, listMarker('- a'), true), 0);
+});
+
+test('listIndentDelta returns a negative value when dedenting a nested item', () => {
+  const value = '- p\n  - a';
+  assert.strictEqual(listIndentDelta(value, 4, listMarker('  - a'), true), -2);
+});
+
+test('computeWrap wraps a selection symmetrically and keeps inner text selected', () => {
+  // value: "foo", select "foo" (0..3), press '*'
+  const r = computeWrap('foo', 0, 3, '*');
+  assert.deepStrictEqual(r, {
+    rangeStart: 0,
+    rangeEnd: 3,
+    text: '*foo*',
+    newSelStart: 1,
+    newSelEnd: 4,
+  });
+});
+
+test('computeWrap each symmetric char wraps open === close === key', () => {
+  for (const ch of ['*', '_', '`', '~', '"', "'"]) {
+    const r = computeWrap('xfoox', 1, 4, ch); // select "foo"
+    assert.strictEqual(r.text, ch + 'foo' + ch, 'char ' + ch);
+    assert.strictEqual(r.newSelStart, 2);
+    assert.strictEqual(r.newSelEnd, 5);
+  }
+});
+
+test('computeWrap brackets use the matching close', () => {
+  assert.strictEqual(computeWrap('foo', 0, 3, '(').text, '(foo)');
+  assert.strictEqual(computeWrap('foo', 0, 3, '[').text, '[foo]');
+  assert.strictEqual(computeWrap('foo', 0, 3, '<').text, '<foo>');
+});
+
+test('computeWrap returns null with no selection (collapsed caret)', () => {
+  assert.strictEqual(computeWrap('foo', 1, 1, '*'), null);
+});
+
+test('computeWrap returns null for a non-trigger char', () => {
+  for (const ch of ['a', ')', ']', '>', '$', '{', '}', '^', '=']) {
+    assert.strictEqual(computeWrap('foo', 0, 3, ch), null, 'char ' + ch);
+  }
+});
+
+test('computeWrap returns null for inherited object keys (no prototype pollution)', () => {
+  for (const ch of ['constructor', 'hasOwnProperty', '__proto__', 'toString']) {
+    assert.strictEqual(computeWrap('foo', 0, 3, ch), null, 'key ' + ch);
+  }
+});
+
+test('computeWrap wraps a multi-line selection as one range, newline preserved', () => {
+  const r = computeWrap('a\nb', 0, 3, '`');
+  assert.strictEqual(r.text, '`a\nb`');
+  assert.strictEqual(r.newSelStart, 1);
+  assert.strictEqual(r.newSelEnd, 4);
+});
+
+test('computeWrap applied twice builds **bold** with inner text still selected', () => {
+  // First wrap: select "foo" in "foo" -> "*foo*", inner selection 1..4
+  const r1 = computeWrap('foo', 0, 3, '*');
+  const v2 = 'foo'.slice(0, r1.rangeStart) + r1.text + 'foo'.slice(r1.rangeEnd);
+  assert.strictEqual(v2, '*foo*');
+  // Second wrap: the inner text is still selected (1..4), press '*' again
+  const r2 = computeWrap(v2, r1.newSelStart, r1.newSelEnd, '*');
+  const v3 = v2.slice(0, r2.rangeStart) + r2.text + v2.slice(r2.rangeEnd);
+  assert.strictEqual(v3, '**foo**');
+  assert.strictEqual(r2.newSelStart, 2);
+  assert.strictEqual(r2.newSelEnd, 5);
 });

@@ -1,5 +1,17 @@
 const INDENT_UNIT = '  ';
 
+const WRAP_PAIRS = {
+  '*': { open: '*', close: '*' },
+  '_': { open: '_', close: '_' },
+  '`': { open: '`', close: '`' },
+  '~': { open: '~', close: '~' },
+  '"': { open: '"', close: '"' },
+  "'": { open: "'", close: "'" },
+  '(': { open: '(', close: ')' },
+  '[': { open: '[', close: ']' },
+  '<': { open: '<', close: '>' },
+};
+
 function listMarker(line) {
   const m = /^( *)([-*+]|\d+[.)])( +)/.exec(line);
   if (!m) return null;
@@ -44,12 +56,33 @@ function owningListLine(value, lineStart, indent) {
   return null;
 }
 
+// The bounds + text of the line containing `pos`. Shared by every line-aware compute.
+function lineBounds(value, pos) {
+  const lineStart = value.lastIndexOf('\n', pos - 1) + 1;
+  let lineEnd = value.indexOf('\n', pos);
+  if (lineEnd === -1) lineEnd = value.length;
+  return { lineStart, lineEnd, line: value.slice(lineStart, lineEnd) };
+}
+
+// Signed indent change (in columns) to nest/un-nest a list line one level, using the
+// contiguous preceding list items as the column ladder. Positive = indent, negative =
+// dedent, 0 = no move (e.g. dedent already at column 0).
+function listIndentDelta(value, lineStart, lm, dedent) {
+  const cols = precedingListContentCols(value, lineStart);
+  if (!dedent) {
+    const deeper = cols.filter(c => c > lm.indent);
+    const newIndent = deeper.length ? Math.min(...deeper) : lm.indent + lm.markerWidth;
+    return newIndent - lm.indent;
+  }
+  if (lm.indent === 0) return 0;
+  const shallower = cols.filter(c => c < lm.indent);
+  shallower.push(0);
+  return Math.max(...shallower) - lm.indent;
+}
+
 function computeSoftBreak(value, selStart, selEnd) {
   if (selStart !== selEnd) return null;
-  const lineStart = value.lastIndexOf('\n', selStart - 1) + 1;
-  let lineEnd = value.indexOf('\n', selStart);
-  if (lineEnd === -1) lineEnd = value.length;
-  const line = value.slice(lineStart, lineEnd);
+  const { line } = lineBounds(value, selStart);
   const lm = listMarker(line);
   const prefixLen = lm ? lm.contentCol : line.length - line.replace(/^ +/, '').length;
   if (prefixLen === 0) return null;
@@ -60,10 +93,7 @@ function computeSoftBreak(value, selStart, selEnd) {
 
 function computeListEnter(value, selStart, selEnd) {
   if (selStart !== selEnd) return null;
-  const lineStart = value.lastIndexOf('\n', selStart - 1) + 1;
-  let lineEnd = value.indexOf('\n', selStart);
-  if (lineEnd === -1) lineEnd = value.length;
-  const line = value.slice(lineStart, lineEnd);
+  const { lineStart, line } = lineBounds(value, selStart);
   if (listMarker(line)) return null; // marker line: GitHub's native Enter auto-continues
   const indent = line.length - line.replace(/^ +/, '').length;
   if (indent === 0) return null; // not an indented continuation
@@ -76,10 +106,7 @@ function computeListEnter(value, selStart, selEnd) {
 }
 
 function computePasteIndent(value, selStart, selEnd, pasted) {
-  const lineStart = value.lastIndexOf('\n', selStart - 1) + 1;
-  let lineEnd = value.indexOf('\n', selStart);
-  if (lineEnd === -1) lineEnd = value.length;
-  const line = value.slice(lineStart, lineEnd);
+  const { line } = lineBounds(value, selStart);
   const lm = listMarker(line);
   const prefixLen = lm ? lm.contentCol : line.length - line.replace(/^ +/, '').length;
   if (prefixLen === 0) return null;
@@ -90,56 +117,40 @@ function computePasteIndent(value, selStart, selEnd, pasted) {
   return { rangeStart: selStart, rangeEnd: selEnd, text, newSelStart: caret, newSelEnd: caret };
 }
 
-function computeIndent(value, selStart, selEnd, opts) {
-  const dedent = !!(opts && opts.dedent);
-  const collapsed = selStart === selEnd;
+// Tab/Shift-Tab with a collapsed caret: indent/dedent the current line.
+function caretIndentEdit(value, selStart, dedent) {
+  const { lineStart, line } = lineBounds(value, selStart);
+  const lm = listMarker(line);
 
-  if (collapsed) {
-    const lineStart = value.lastIndexOf('\n', selStart - 1) + 1;
-    let lineEnd = value.indexOf('\n', selStart);
-    if (lineEnd === -1) lineEnd = value.length;
-    const line = value.slice(lineStart, lineEnd);
-    const lm = listMarker(line);
-
-    if (lm) {
-      // List item: indent/dedent the whole line by one nesting level.
-      let newIndent;
-      if (!dedent) {
-        const cols = precedingListContentCols(value, lineStart);
-        const deeper = cols.filter(c => c > lm.indent);
-        newIndent = deeper.length ? Math.min(...deeper) : lm.indent + lm.markerWidth;
-      } else {
-        if (lm.indent === 0) return null;
-        const cols = precedingListContentCols(value, lineStart);
-        const shallower = cols.filter(c => c < lm.indent);
-        shallower.push(0);
-        newIndent = Math.max(...shallower);
-      }
-      const delta = newIndent - lm.indent;
-      if (delta === 0) return null;
-      if (delta > 0) {
-        const caret = selStart + delta;
-        return { rangeStart: lineStart, rangeEnd: lineStart, text: ' '.repeat(delta), newSelStart: caret, newSelEnd: caret };
-      }
-      const remove = -delta;
-      const caret = Math.max(lineStart, selStart - remove);
-      return { rangeStart: lineStart, rangeEnd: lineStart + remove, text: '', newSelStart: caret, newSelEnd: caret };
+  if (lm) {
+    // List item: indent/dedent the whole line by one nesting level.
+    const delta = listIndentDelta(value, lineStart, lm, dedent);
+    if (delta === 0) return null;
+    if (delta > 0) {
+      const caret = selStart + delta;
+      return { rangeStart: lineStart, rangeEnd: lineStart, text: ' '.repeat(delta), newSelStart: caret, newSelEnd: caret };
     }
-
-    // Not a list line -> v1 behavior.
-    if (!dedent) {
-      const caret = selStart + INDENT_UNIT.length;
-      return { rangeStart: selStart, rangeEnd: selStart, text: INDENT_UNIT, newSelStart: caret, newSelEnd: caret };
-    }
-    let i = 0;
-    while (i < INDENT_UNIT.length && value[lineStart + i] === ' ') i++;
-    if (i === 0) return null;
-    const caret = Math.max(lineStart, selStart - i);
-    return { rangeStart: lineStart, rangeEnd: lineStart + i, text: '', newSelStart: caret, newSelEnd: caret };
+    const remove = -delta;
+    const caret = Math.max(lineStart, selStart - remove);
+    return { rangeStart: lineStart, rangeEnd: lineStart + remove, text: '', newSelStart: caret, newSelEnd: caret };
   }
 
-  // Selection: shift the affected block by one uniform level (list-aware via the first line).
-  const lineStart = value.lastIndexOf('\n', selStart - 1) + 1;
+  // Not a list line -> plain 2-space insert/strip at the caret (v1 behavior).
+  if (!dedent) {
+    const caret = selStart + INDENT_UNIT.length;
+    return { rangeStart: selStart, rangeEnd: selStart, text: INDENT_UNIT, newSelStart: caret, newSelEnd: caret };
+  }
+  let i = 0;
+  while (i < INDENT_UNIT.length && value[lineStart + i] === ' ') i++;
+  if (i === 0) return null;
+  const caret = Math.max(lineStart, selStart - i);
+  return { rangeStart: lineStart, rangeEnd: lineStart + i, text: '', newSelStart: caret, newSelEnd: caret };
+}
+
+// Tab/Shift-Tab with a range selection: shift the affected block by one uniform level
+// (list-aware via the first line).
+function selectionIndentEdit(value, selStart, selEnd, dedent) {
+  const { lineStart } = lineBounds(value, selStart);
   let effectiveEnd = selEnd;
   if (value[selEnd - 1] === '\n') effectiveEnd = selEnd - 1; // don't pull in the next line
   let lineEnd = value.indexOf('\n', effectiveEnd);
@@ -150,30 +161,10 @@ function computeIndent(value, selStart, selEnd, opts) {
   const firstLine = nl === -1 ? block : block.slice(0, nl);
   const flm = listMarker(firstLine);
 
-  let delta;
-  if (!dedent) {
-    if (flm) {
-      const cols = precedingListContentCols(value, lineStart);
-      const deeper = cols.filter(c => c > flm.indent);
-      const newIndent = deeper.length ? Math.min(...deeper) : flm.indent + flm.markerWidth;
-      delta = newIndent - flm.indent;
-    } else {
-      delta = INDENT_UNIT.length;
-    }
-  } else {
-    if (flm) {
-      if (flm.indent === 0) {
-        delta = 0;
-      } else {
-        const cols = precedingListContentCols(value, lineStart);
-        const shallower = cols.filter(c => c < flm.indent);
-        shallower.push(0);
-        delta = flm.indent - Math.max(...shallower);
-      }
-    } else {
-      delta = INDENT_UNIT.length;
-    }
-  }
+  // Shift magnitude: list-aware from the first line, else a plain indent unit.
+  // listIndentDelta is signed (negative when dedenting); here we only need the
+  // magnitude because direction is already carried by `dedent` below.
+  const delta = flm ? Math.abs(listIndentDelta(value, lineStart, flm, dedent)) : INDENT_UNIT.length;
   if (delta === 0) return null;
 
   const newBlock = block
@@ -199,6 +190,24 @@ function computeIndent(value, selStart, selEnd, opts) {
   };
 }
 
+function computeIndent(value, selStart, selEnd, opts) {
+  const dedent = !!(opts && opts.dedent);
+  return selStart === selEnd
+    ? caretIndentEdit(value, selStart, dedent)
+    : selectionIndentEdit(value, selStart, selEnd, dedent);
+}
+
+function computeWrap(value, selStart, selEnd, ch) {
+  if (selStart === selEnd) return null; // no selection -> type natively
+  if (!Object.prototype.hasOwnProperty.call(WRAP_PAIRS, ch)) return null; // not a trigger char
+  const pair = WRAP_PAIRS[ch];
+  const selected = value.slice(selStart, selEnd);
+  const text = pair.open + selected + pair.close;
+  const newSelStart = selStart + pair.open.length;
+  const newSelEnd = newSelStart + selected.length;
+  return { rangeStart: selStart, rangeEnd: selEnd, text, newSelStart, newSelEnd };
+}
+
 // Expose for the content script (shared isolated-world global) and for Node tests.
 if (typeof globalThis !== 'undefined') {
   globalThis.GMTI = globalThis.GMTI || {};
@@ -208,10 +217,14 @@ if (typeof globalThis !== 'undefined') {
   globalThis.GMTI.precedingListContentCols = precedingListContentCols;
   globalThis.GMTI.nextMarker = nextMarker;
   globalThis.GMTI.owningListLine = owningListLine;
+  globalThis.GMTI.lineBounds = lineBounds;
+  globalThis.GMTI.listIndentDelta = listIndentDelta;
   globalThis.GMTI.computeSoftBreak = computeSoftBreak;
   globalThis.GMTI.computeListEnter = computeListEnter;
   globalThis.GMTI.computePasteIndent = computePasteIndent;
+  globalThis.GMTI.computeWrap = computeWrap;
+  globalThis.GMTI.WRAP_PAIRS = WRAP_PAIRS;
 }
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { computeIndent, INDENT_UNIT, listMarker, precedingListContentCols, nextMarker, owningListLine, computeSoftBreak, computeListEnter, computePasteIndent };
+  module.exports = { computeIndent, INDENT_UNIT, listMarker, precedingListContentCols, nextMarker, owningListLine, lineBounds, listIndentDelta, computeSoftBreak, computeListEnter, computePasteIndent, computeWrap, WRAP_PAIRS };
 }

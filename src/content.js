@@ -1,7 +1,7 @@
 (function () {
   const GMTI = globalThis.GMTI;
   if (!GMTI || !GMTI.computeIndent) return;
-  const { computeIndent, computeSoftBreak, computeListEnter, computePasteIndent } = GMTI;
+  const { computeIndent, computeSoftBreak, computeListEnter, computePasteIndent, computeWrap, WRAP_PAIRS } = GMTI;
 
   // Known markdown editing textareas. The React "new issue" description carries
   // aria-label="Markdown value", but the comment composer instead uses
@@ -53,7 +53,9 @@
       const isTab = e.key === 'Tab';
       const isShiftEnter = e.key === 'Enter' && e.shiftKey;
       const isPlainEnter = e.key === 'Enter' && !e.shiftKey;
-      if (!isTab && !isShiftEnter && !isPlainEnter) return;
+      // A wrap candidate: a single trigger char, not mid-IME-composition.
+      const isWrap = !e.isComposing && Object.prototype.hasOwnProperty.call(WRAP_PAIRS, e.key);
+      if (!isTab && !isShiftEnter && !isPlainEnter && !isWrap) return;
 
       const ta = e.target;
       if (!isMarkdownField(ta)) return;
@@ -70,6 +72,20 @@
         e.preventDefault();
         e.stopPropagation();
         if (!r) return;
+        try { applyEdit(ta, r); } catch (err) { /* never break the box */ }
+        return;
+      }
+
+      if (isWrap) {
+        let r;
+        try {
+          r = computeWrap(ta.value, ta.selectionStart, ta.selectionEnd, e.key);
+        } catch (err) {
+          return; // unexpected failure -> native typing
+        }
+        if (!r) return; // no selection / non-trigger -> let the char type normally
+        e.preventDefault();
+        e.stopPropagation();
         try { applyEdit(ta, r); } catch (err) { /* never break the box */ }
         return;
       }
