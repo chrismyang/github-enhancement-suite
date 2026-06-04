@@ -1,8 +1,10 @@
-# Feature Ideas (parked for post-v1)
+# Feature Ideas (backlog)
 
-Backlog for the GitHub markdown editing enhancement extension. **v1 ships Tab/Shift-Tab
-indent only** — these are deferred. Each note includes findings from the live DOM probes
-(2026-06-03) so we don't re-investigate later.
+Backlog for the GitHub markdown editing enhancement extension. Each note includes findings
+from the live DOM probes (2026-06-03) so we don't re-investigate later.
+
+**Already shipped:** Tab/Shift-Tab list-aware indent (v1 + v2), Shift+Enter in-item
+continuation + Enter-to-new-item, monospace editor font, and multi-line paste re-indent.
 
 ## Probe findings that apply to everything here
 
@@ -26,25 +28,7 @@ Selecting a text range and typing a surrounding character sequence (e.g. `~~` st
 - Builds directly on the same selection + `execCommand` engine as Tab indent.
 - Natural companion to the indent work; good early follow-up.
 
-## 2. Shift+Enter list continuation (Google-Docs / Word style)
-
-Inside a list, Shift+Enter should insert a soft line break that stays **within the current
-list item**, with continuation text aligned under the bullet's text rather than starting a
-new bullet.
-
-- Open question (flagged during brainstorming): GitHub already auto-continues lists on plain
-  Enter, so we need to define exact markdown semantics — soft line within same item vs. just
-  matching indentation. Decide before building.
-- Cheap-ish: reuses the selection/`execCommand` engine.
-
-## 3. Fixed-width (monospace) font while editing
-
-Render the editing textarea in a monospace font.
-
-- Trivial CSS injection, near-zero risk.
-- Decision still open: always-on vs. a toggle (toggle needs an options page / popup).
-
-## 4. Grey-out link URLs (light syntax styling)
+## 2. Grey-out link URLs (light syntax styling)
 
 Dim the URL portion of a markdown link (and potentially other light syntax highlighting).
 
@@ -56,16 +40,8 @@ Dim the URL portion of a markdown link (and potentially other light syntax highl
 
 ## Other candidates (unprioritized)
 
-- **Paste multi-line text as implicit soft-breaks (Google-Docs style).** When pasting multi-line
-  plain text while the caret is in a list item, re-indent the pasted lines to the item's content
-  column so the whole block stays in the item (analogous to the Shift+Enter soft break). Deferred
-  from the Shift+Enter push (2026-06-03) due to high interaction risk with GitHub's native paste:
-  it converts pasted rich text/HTML to markdown (`js-paste-markdown`), uploads pasted images, and
-  turns a pasted URL over a selection into a link. Must scope narrowly — intercept ONLY when the
-  clipboard is multi-line *plain* text with no files/HTML and the caret is in a list/indented
-  context; let everything else fall through to GitHub.
 - Configurable indent unit (2 spaces default vs. tabs vs. 4 spaces).
-- Auto-continue / smart handling of numbered lists and checkboxes.
+- Smart ordered-list renumbering (e.g. renumber following items when one is inserted/removed).
 - Markdown table column alignment helper.
 - **Harden the autocomplete stand-down.** `autocompleteOpen()` in `content.js` falls back to a
   global `document.querySelector('[role="listbox"]')` visibility check. On listbox-heavy pages
