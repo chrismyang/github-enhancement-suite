@@ -41,6 +41,15 @@ Verified live on real GitHub (2026-06-04):
 - `type=issues` returns **issues only**; `type=pullrequests` returns **PRs only** (both 200, both
   parse identically). To include both, fire **two fetches and merge**.
 
+**Chosen backend: the same-origin scrape (no token).** It reuses the existing login with zero
+setup, which is preferred for a personal, load-unpacked extension. The cost is parsing an
+undocumented hydration blob that can change on a GitHub redesign — mitigated by fully defensive
+parsing (below). _Verified equivalent fallback:_ `GET api.github.com/search/issues?q=…` returned
+the **identical results in identical order** to the web search for the same query (same engine),
+so if the embedded-blob scrape ever breaks, switching to the documented REST API — at the cost of
+a read-only token + an `api.github.com` host permission — is a drop-in quality-equivalent
+replacement.
+
 ## Behavior
 
 - **Trigger:** `Ctrl+;` while focused in a markdown field opens the overlay. The native
@@ -48,13 +57,17 @@ Verified live on real GitHub (2026-06-04):
 - **Default scope:** a hardcoded `DEFAULT_SCOPE = 'org:dragonflyic'` is prepended to the user's
   free text, *unless* the text already contains a scoping qualifier (`org:`, `repo:`, `user:`,
   or `owner:`), in which case the text is used as-is (lets the user broaden/redirect).
-- **Search:** debounced (~200 ms) as the user types; two parallel same-origin fetches
-  (`type=issues`, `type=pullrequests`); results parsed, merged, and listed.
+- **Search:** the user types a full query and presses **Enter** to run it (NOT debounced
+  as-you-type). On Enter, two parallel same-origin fetches (`type=issues`,
+  `type=pullrequests`); results parsed, merged, and listed with the first row auto-highlighted.
 - **Result row:** issue-vs-PR icon, state (open / closed / merged), plain-text title, and
   `repo#number`.
-- **Insert:** Enter (or click) inserts `owner/repo#123` at the caret position captured when the
-  overlay opened, via the existing `execCommand` path. Always fully-qualified — GitHub renders
-  `owner/repo#123` as `#123` automatically when it is the current repo.
+- **Enter semantics (two stages):** while the input has focus and the query is unchanged since
+  the last run, Enter inserts the highlighted result; editing the query makes Enter re-run the
+  search instead. Up/Down move the highlight; click also inserts.
+- **Insert:** inserts `owner/repo#123` at the caret position captured when the overlay opened,
+  via the existing `execCommand` path. Always fully-qualified — GitHub renders `owner/repo#123`
+  as `#123` automatically when it is the current repo.
 - **Dismiss:** Escape or blur closes the overlay and restores focus to the textarea; nothing is
   inserted.
 
@@ -86,9 +99,11 @@ Normalized `Result`: `{ kind: 'issue' | 'pr', number, owner, repo, title, state,
 
 - Creates/owns the overlay element (search input + results `<ul>`), positioned anchored to the
   focused textarea (below it for MVP — not caret-pixel precise).
-- Debounced search: builds the query via `buildQuery`, fetches both types same-origin with
-  `credentials: 'same-origin'`, calls `parseResultsHtml`, `mergeResults`, renders rows.
-- Keyboard nav inside the overlay: Up/Down to move selection, Enter to choose, Escape to cancel.
+- Enter-run search: on Enter in the input, builds the query via `buildQuery`, fetches both
+  types same-origin with `credentials: 'same-origin'`, calls `parseResultsHtml`, `mergeResults`,
+  renders rows, auto-highlights the first. No debounce / no as-you-type requests.
+- Keyboard nav inside the overlay: Up/Down move the highlight; Enter inserts the highlighted
+  result (or re-runs the search if the query changed since the last run); Escape cancels.
 - On choose: invokes a callback with `buildReference(result)`; on cancel/blur: closes and
   refocuses the textarea.
 - Fetch failure → a non-fatal "couldn't search" state in the overlay (no exception escapes).
@@ -145,8 +160,9 @@ titles into logs.
 
 ## Scope
 
-**MVP (this spec):** `Ctrl+;` trigger → debounced dual-fetch search → merged list with plain-text
-titles → insert `owner/repo#123`. Overlay anchored under the textarea.
+**MVP (this spec):** `Ctrl+;` trigger → type query → **Enter-run** dual-fetch search → merged
+list with plain-text titles → arrow + Enter inserts `owner/repo#123`. Overlay anchored under the
+textarea.
 
 **Deferred polish (not now):** safe `<em>` highlight rendering; exact caret-pixel positioning;
 collapsing same-repo references to bare `#123`; recency-vs-relevance sort tuning; a `;;` text
