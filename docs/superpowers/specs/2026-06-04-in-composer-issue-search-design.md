@@ -1,12 +1,13 @@
-# In-composer issue/PR search — design
+# In-composer issue search — design
 
 _Spec date: 2026-06-04_
 
 ## Summary
 
 Add a search overlay, opened with **`Ctrl+;`** from inside any GitHub markdown textarea, that
-lets you find an issue or PR with the **full `github.com/search` engine** (free text + all
-qualifiers) and insert a reference (`owner/repo#123`) at the caret. It exists because GitHub's
+lets you find an issue with the **full `github.com/search` engine** (free text + all
+qualifiers) and insert a reference (`owner/repo#123`) at the caret. **MVP is issues only**
+(searching pull requests is a deferred follow-up — see Scope). It exists because GitHub's
 native `#` autocomplete has weak recall/ranking and no qualifier support, so finding the right
 issue while composing a comment is painful relative to `github.com/search`.
 
@@ -39,7 +40,8 @@ Verified live on real GitHub (2026-06-04):
   `repo.repository.name`, `labels`, `num_comments`, `author_name`, `created`, and
   `issue.issue.pull_request_id` (null ⇒ issue).
 - `type=issues` returns **issues only**; `type=pullrequests` returns **PRs only** (both 200, both
-  parse identically). To include both, fire **two fetches and merge**.
+  parse identically). **MVP fetches `type=issues` only** — a single request. Adding PRs later is
+  just a second `type=pullrequests` fetch plus a merge (deferred — see Scope).
 
 **Chosen backend: the same-origin scrape (no token).** It reuses the existing login with zero
 setup, which is preferred for a personal, load-unpacked extension. The cost is parsing an
@@ -58,10 +60,9 @@ replacement.
   free text, *unless* the text already contains a scoping qualifier (`org:`, `repo:`, `user:`,
   or `owner:`), in which case the text is used as-is (lets the user broaden/redirect).
 - **Search:** the user types a full query and presses **Enter** to run it (NOT debounced
-  as-you-type). On Enter, two parallel same-origin fetches (`type=issues`,
-  `type=pullrequests`); results parsed, merged, and listed with the first row auto-highlighted.
-- **Result row:** issue-vs-PR icon, state (open / closed / merged), plain-text title, and
-  `repo#number`.
+  as-you-type). On Enter, a single same-origin fetch (`type=issues`); results parsed and listed
+  with the first row auto-highlighted.
+- **Result row:** state (open / closed), plain-text title, and `repo#number`.
 - **Enter semantics (two stages):** while the input has focus and the query is unchanged since
   the last run, Enter inserts the highlighted result; editing the query makes Enter re-run the
   search instead. Up/Down move the highlight; click also inserts.
@@ -82,26 +83,23 @@ Exposed on `globalThis.GMTI` and `module.exports`, matching the project pattern.
 - `const DEFAULT_SCOPE = 'org:dragonflyic';`
 - `buildQuery(rawText, defaultScope)` → `string`. If `/\b(org|repo|user|owner):/i.test(rawText)`
   return `rawText.trim()`; else return `` `${defaultScope} ${rawText.trim()}` ``.
-- `parseResultsHtml(htmlString, kind)` → `Array<Result>`. Extracts the
-  `react-app.embeddedData` script's JSON **by string match (NOT DOMParser, so it runs under
-  node:test)**, `JSON.parse`s it, maps `payload.results` to the normalized shape below. Any
-  failure (no blob, bad JSON, missing fields) returns `[]` — never throws.
-- `mergeResults(issues, prs)` → interleaved `Array<Result>` (relevance-ranked within each kind;
-  interleave by rank position).
+- `parseResultsHtml(htmlString)` → `Array<Result>`. Extracts the `react-app.embeddedData`
+  script's JSON **by string match (NOT DOMParser, so it runs under node:test)**, `JSON.parse`s
+  it, maps `payload.results` to the normalized shape below. Any failure (no blob, bad JSON,
+  missing fields) returns `[]` — never throws.
 - `buildReference(result)` → `` `${result.owner}/${result.repo}#${result.number}` ``.
 - `stripTags(hl)` → plain text (removes `<em>`/all tags; decodes basic entities). MVP titles are
   plain text.
 
-Normalized `Result`: `{ kind: 'issue' | 'pr', number, owner, repo, title, state, merged }`
-(`kind` comes from the originating fetch, not from re-deriving it).
+Normalized `Result`: `{ number, owner, repo, title, state }` (issues only in the MVP).
 
 ### `src/issue-search-ui.js` — glue (DOM + network)
 
 - Creates/owns the overlay element (search input + results `<ul>`), positioned anchored to the
   focused textarea (below it for MVP — not caret-pixel precise).
-- Enter-run search: on Enter in the input, builds the query via `buildQuery`, fetches both
-  types same-origin with `credentials: 'same-origin'`, calls `parseResultsHtml`, `mergeResults`,
-  renders rows, auto-highlights the first. No debounce / no as-you-type requests.
+- Enter-run search: on Enter in the input, builds the query via `buildQuery`, fetches
+  `type=issues` same-origin with `credentials: 'same-origin'`, calls `parseResultsHtml`, renders
+  rows, auto-highlights the first. No debounce / no as-you-type requests.
 - Keyboard nav inside the overlay: Up/Down move the highlight; Enter inserts the highlighted
   result (or re-runs the search if the query changed since the last run); Escape cancels.
 - On choose: invokes a callback with `buildReference(result)`; on cancel/blur: closes and
@@ -139,31 +137,31 @@ Normalized `Result`: `{ kind: 'issue' | 'pr', number, owner, repo, title, state,
 ### Unit (`tests/`, node:test) — the pure module
 
 Against a saved **HTML fixture** (a real `/search?...&type=issues` response trimmed to a couple
-of results) plus a `type=pullrequests` fixture:
+of results):
 
 - `buildQuery`: prepends `DEFAULT_SCOPE`; leaves text untouched when it already has
   `org:`/`repo:`/`user:`/`owner:`; trims.
 - `parseResultsHtml`: extracts results from the fixture with correct
-  `number/owner/repo/title/state/kind`; returns `[]` for empty HTML, malformed JSON, and a
-  missing `embeddedData` blob.
-- `mergeResults`: interleaves issues and PRs as specified.
+  `number/owner/repo/title/state`; returns `[]` for empty HTML, malformed JSON, and a missing
+  `embeddedData` blob.
 - `buildReference`: `owner/repo#number`.
 - `stripTags`: removes `<em>` and decodes entities.
 
 ### Live verification (Playwright, real GitHub)
 
 Per `CLAUDE.md` (reload the extension **and reload the page** so the updated content script is
-injected). Then: `Ctrl+;` opens the overlay; a query returns merged issue+PR results; arrow/Enter
-inserts `owner/repo#123` at the caret; Escape closes and restores focus; native `#`/`@` still
-work. To protect private data, checks assert structure/counts rather than echoing `dragonflyic`
-titles into logs.
+injected). Then: `Ctrl+;` opens the overlay; a query returns issue results; arrow/Enter inserts
+`owner/repo#123` at the caret; Escape closes and restores focus; native `#`/`@` still work. To
+protect private data, checks assert structure/counts rather than echoing `dragonflyic` titles
+into logs.
 
 ## Scope
 
-**MVP (this spec):** `Ctrl+;` trigger → type query → **Enter-run** dual-fetch search → merged
+**MVP (this spec):** `Ctrl+;` trigger → type query → **Enter-run** single `type=issues` search →
 list with plain-text titles → arrow + Enter inserts `owner/repo#123`. Overlay anchored under the
 textarea.
 
-**Deferred polish (not now):** safe `<em>` highlight rendering; exact caret-pixel positioning;
-collapsing same-repo references to bare `#123`; recency-vs-relevance sort tuning; a `;;` text
-trigger in addition to the chord; a runtime-configurable scope (options page).
+**Deferred polish (not now):** **searching pull requests too** (a second `type=pullrequests`
+fetch + merge, with an issue-vs-PR icon and merged-state); safe `<em>` highlight rendering; exact
+caret-pixel positioning; collapsing same-repo references to bare `#123`; recency-vs-relevance sort
+tuning; a `;;` text trigger in addition to the chord; a runtime-configurable scope (options page).
