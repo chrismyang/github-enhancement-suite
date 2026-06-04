@@ -1,7 +1,7 @@
 (function () {
   const GMTI = globalThis.GMTI;
   if (!GMTI || !GMTI.computeIndent) return;
-  const { computeIndent, computeSoftBreak, computeListEnter } = GMTI;
+  const { computeIndent, computeSoftBreak, computeListEnter, computePasteIndent } = GMTI;
 
   // Known markdown editing textareas. The React "new issue" description carries
   // aria-label="Markdown value", but the comment composer instead uses
@@ -84,6 +84,32 @@
         return; // native behavior
       }
       if (!r) return; // not our case -> let GitHub's native Enter/newline run
+      e.preventDefault();
+      e.stopPropagation();
+      try { applyEdit(ta, r); } catch (err) { /* never break the box */ }
+    },
+    true // capture phase
+  );
+
+  document.addEventListener(
+    'paste',
+    function (e) {
+      const ta = e.target;
+      if (!isMarkdownField(ta)) return;
+      const dt = e.clipboardData;
+      if (!dt) return;
+      if (dt.files && dt.files.length) return; // images/files -> native upload
+      if ((dt.types || []).includes('text/html')) return; // rich paste -> GitHub's HTML->markdown
+      const pasted = dt.getData('text/plain');
+      if (!pasted) return;
+
+      let r;
+      try {
+        r = computePasteIndent(ta.value, ta.selectionStart, ta.selectionEnd, pasted);
+      } catch (err) {
+        return; // unexpected failure -> native paste
+      }
+      if (!r) return; // single-line / not a list context -> native paste
       e.preventDefault();
       e.stopPropagation();
       try { applyEdit(ta, r); } catch (err) { /* never break the box */ }

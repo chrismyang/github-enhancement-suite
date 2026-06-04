@@ -75,6 +75,21 @@ function computeListEnter(value, selStart, selEnd) {
   return { rangeStart: selStart, rangeEnd: selStart, text, newSelStart: caret, newSelEnd: caret };
 }
 
+function computePasteIndent(value, selStart, selEnd, pasted) {
+  const lineStart = value.lastIndexOf('\n', selStart - 1) + 1;
+  let lineEnd = value.indexOf('\n', selStart);
+  if (lineEnd === -1) lineEnd = value.length;
+  const line = value.slice(lineStart, lineEnd);
+  const lm = listMarker(line);
+  const prefixLen = lm ? lm.contentCol : line.length - line.replace(/^ +/, '').length;
+  if (prefixLen === 0) return null;
+  const normalized = pasted.replace(/\r\n?/g, '\n');
+  if (normalized.indexOf('\n') === -1) return null;
+  const text = normalized.replace(/\n/g, '\n' + ' '.repeat(prefixLen));
+  const caret = selStart + text.length;
+  return { rangeStart: selStart, rangeEnd: selEnd, text, newSelStart: caret, newSelEnd: caret };
+}
+
 function computeIndent(value, selStart, selEnd, opts) {
   const dedent = !!(opts && opts.dedent);
   const collapsed = selStart === selEnd;
@@ -195,7 +210,8 @@ if (typeof globalThis !== 'undefined') {
   globalThis.GMTI.owningListLine = owningListLine;
   globalThis.GMTI.computeSoftBreak = computeSoftBreak;
   globalThis.GMTI.computeListEnter = computeListEnter;
+  globalThis.GMTI.computePasteIndent = computePasteIndent;
 }
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { computeIndent, INDENT_UNIT, listMarker, precedingListContentCols, nextMarker, owningListLine, computeSoftBreak, computeListEnter };
+  module.exports = { computeIndent, INDENT_UNIT, listMarker, precedingListContentCols, nextMarker, owningListLine, computeSoftBreak, computeListEnter, computePasteIndent };
 }

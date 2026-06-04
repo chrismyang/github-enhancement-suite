@@ -395,3 +395,38 @@ test('computeListEnter returns null when there is no owning list item', () => {
 test('computeListEnter returns null for a selection', () => {
   assert.strictEqual(computeListEnter('- foo\n  bar', 0, 11), null);
 });
+
+const { computePasteIndent } = require('../src/indent.js');
+
+test('computePasteIndent re-indents a multi-line paste into a bullet item (2)', () => {
+  const r = computePasteIndent('- foo', 5, 5, 'a\nb\nc');
+  assert.deepStrictEqual(r, { rangeStart: 5, rangeEnd: 5, text: 'a\n  b\n  c', newSelStart: 14, newSelEnd: 14 });
+});
+
+test('computePasteIndent aligns to an ordered item content column (3)', () => {
+  const r = computePasteIndent('1. x', 4, 4, 'a\nb');
+  assert.deepStrictEqual(r, { rangeStart: 4, rangeEnd: 4, text: 'a\n   b', newSelStart: 10, newSelEnd: 10 });
+});
+
+test('computePasteIndent matches a continuation line indent (2)', () => {
+  const r = computePasteIndent('- foo\n  bar', 11, 11, 'x\ny');
+  assert.deepStrictEqual(r, { rangeStart: 11, rangeEnd: 11, text: 'x\n  y', newSelStart: 16, newSelEnd: 16 });
+});
+
+test('computePasteIndent replaces a selection', () => {
+  const r = computePasteIndent('- foobar', 5, 8, 'X\nY');
+  assert.deepStrictEqual(r, { rangeStart: 5, rangeEnd: 8, text: 'X\n  Y', newSelStart: 10, newSelEnd: 10 });
+});
+
+test('computePasteIndent normalizes CRLF to LF', () => {
+  const r = computePasteIndent('- foo', 5, 5, 'a\r\nb');
+  assert.deepStrictEqual(r, { rangeStart: 5, rangeEnd: 5, text: 'a\n  b', newSelStart: 10, newSelEnd: 10 });
+});
+
+test('computePasteIndent returns null for a single-line paste', () => {
+  assert.strictEqual(computePasteIndent('- foo', 5, 5, 'hello'), null);
+});
+
+test('computePasteIndent returns null on a non-list, non-indented line', () => {
+  assert.strictEqual(computePasteIndent('hello', 5, 5, 'a\nb'), null);
+});
