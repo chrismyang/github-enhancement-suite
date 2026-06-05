@@ -87,7 +87,11 @@ because the query (`org:dragonflyic is:issue …`) must stay separate from the c
 **Layout:**
 - **Query input** (top): a single-line `<input>` pre-filled with `DEFAULT_QUERY`, caret at end.
 - **Results list** (below): one row per result, styled after the native `#` popup —
-  - leading **icon**: issue vs PR + open/closed (from `state` + `isPullRequest`),
+  - leading **icon**: GitHub's actual Octicon SVG for the item's state — open issue
+    (`issue-opened`, green), closed issue (`check-circle`, purple; or `skip`, grey when
+    `stateReason === 'not_planned'`), open PR (`git-pull-request`, green), merged PR
+    (`git-merge`, purple), closed PR (`git-pull-request-closed`, red). Static SVG markup (not
+    remote data), colored via CSS,
   - **title**: plain text, truncated with ellipsis, one line,
   - trailing **`owner/repo#number`**: muted, right-aligned,
   - a secondary **snippet line**: muted/smaller, the body text around the match (`hl_text`,
@@ -125,13 +129,18 @@ Exposed on `globalThis.GMTI` and `module.exports`, matching the project pattern.
   it, maps `payload.results` to the normalized shape below. Field mapping: `number`,
   `repo.repository.owner_login` → `owner`, `repo.repository.name` → `repo`,
   `stripTags(hl_title)` → `title`, `stripTags(hl_text)` → `snippet`, `state`,
-  `issue.issue.pull_request_id != null` → `isPullRequest`. Any failure (no blob, bad JSON,
-  missing fields) returns `[]` — never throws.
+  `issue.issue.pull_request_id != null` → `isPullRequest`, `!!merged` → `merged`,
+  `state_reason || null` → `stateReason`. Any failure (no blob, bad JSON, missing fields)
+  returns `[]` — never throws.
 - `buildReference(result)` → `` `${result.owner}/${result.repo}#${result.number}` ``.
-- `stripTags(hl)` → plain text (removes `<em>`/all tags; decodes basic entities). Used for both
-  `title` and `snippet` (MVP renders them as plain text).
+- `stripTags(hl)` → plain text (removes `<em>`/all tags; decodes named entities AND numeric
+  character references — hex `&#x27;` and decimal `&#39;` — since GitHub's `hl_title` encodes
+  punctuation like `'` and `/` as numeric refs). Decoding never throws (out-of-range code points
+  are left as-is). Used for both `title` and `snippet` (MVP renders them as plain text). Note:
+  GitHub's `hl_text` snippets already replace some punctuation (e.g. apostrophes) with spaces on
+  their side — a GitHub artifact we can't recover.
 
-Normalized `Result`: `{ number, owner, repo, title, snippet, state, isPullRequest }`.
+Normalized `Result`: `{ number, owner, repo, title, snippet, state, isPullRequest, merged, stateReason }`.
 
 ### `src/issue-search-ui.js` — glue (DOM + network)
 
@@ -183,8 +192,8 @@ of results):
 
 - `searchUrl`: trims and URL-encodes the query text and appends `&type=issues`.
 - `parseResultsHtml`: extracts results from the fixture with correct
-  `number/owner/repo/title/snippet/state/isPullRequest`; returns `[]` for empty HTML, malformed
-  JSON, and a missing `embeddedData` blob.
+  `number/owner/repo/title/snippet/state/isPullRequest/merged/stateReason`; returns `[]` for
+  empty HTML, malformed JSON, and a missing `embeddedData` blob.
 - `buildReference`: `owner/repo#number`.
 - `stripTags`: removes `<em>` and decodes entities.
 
@@ -205,7 +214,7 @@ plain-text titles → arrow + Enter inserts `owner/repo#123`. Defaults to issues
 
 **Deferred polish (not now):** **issues + PRs merged into one list** (the box already *reaches*
 either kind via `is:issue`/`is:pr`; showing both at once would need a second fetch + merge);
-richer state icons (e.g. merged-PR purple, beyond MVP's open/closed + issue/PR); safe `<em>`
+safe `<em>`
 highlight rendering in titles/snippets; continuous reposition-on-scroll (MVP closes on scroll);
 collapsing same-repo references to bare `#123`; recency-vs-relevance sort tuning; a `;;` text
 trigger in addition to the chord; a runtime-configurable scope (options page).

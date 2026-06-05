@@ -49,6 +49,27 @@
   document.addEventListener(
     'keydown',
     function (e) {
+      // Ctrl+; opens our issue-search overlay (a chord GitHub doesn't use). Handled
+      // before the Ctrl/Alt/Meta early-return below.
+      if (e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey && e.key === ';') {
+        const ta = e.target;
+        if (!isMarkdownField(ta) || autocompleteOpen(ta) || !GMTI.openIssueSearch) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const caret = ta.selectionStart;
+        try {
+          GMTI.openIssueSearch(ta, caret, function (ref) {
+            try {
+              ta.focus();
+              applyEdit(ta, {
+                rangeStart: caret, rangeEnd: caret, text: ref,
+                newSelStart: caret + ref.length, newSelEnd: caret + ref.length,
+              });
+            } catch (err) { /* never break the box */ }
+          });
+        } catch (err) { /* never break the box */ }
+        return;
+      }
       if (e.ctrlKey || e.altKey || e.metaKey) return; // leave Ctrl/⌘+Enter (submit) etc. alone
       const isTab = e.key === 'Tab';
       const isShiftEnter = e.key === 'Enter' && e.shiftKey;

@@ -4,8 +4,8 @@ Backlog for the GitHub markdown editing enhancement extension. Each note include
 from the live DOM probes (2026-06-03) so we don't re-investigate later.
 
 **Already shipped:** Tab/Shift-Tab list-aware indent (v1 + v2), Shift+Enter in-item
-continuation + Enter-to-new-item, monospace editor font, multi-line paste re-indent, and
-selection wrapping with surrounding characters.
+continuation + Enter-to-new-item, monospace editor font, multi-line paste re-indent,
+selection wrapping with surrounding characters, and the Ctrl+; in-composer issue search.
 
 ## Probe findings that apply to everything here
 

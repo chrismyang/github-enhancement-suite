@@ -22,13 +22,21 @@ rather than duplicating it here. Backlog and probe findings live in `FEATURE_IDE
 
 ```
 manifest.json          MV3; one content_scripts entry on https://github.com/* :
-                       js = [src/indent.js, src/content.js], css = [src/editor.css]
+                       js = [src/indent.js, src/issue-search.js, src/issue-search-ui.js,
+                       src/content.js], css = [src/editor.css, src/issue-search.css]
 src/indent.js          PURE logic — no DOM. All text-edit computations + helpers. Exported on
                        globalThis.GMTI.* (for the content script) AND module.exports (for tests).
-src/content.js         DOM glue — the ONLY file touching the DOM/events. Capture-phase keydown
-                       + paste listeners; field detection; execCommand apply.
+src/issue-search.js    PURE logic — no DOM/network. Issue-search query/URL building, parsing the
+                       /search embedded-JSON blob, reference building. On GMTI.* + module.exports.
+src/issue-search-ui.js DOM/network glue — the caret-anchored search overlay (mirror-div position,
+                       same-origin fetch, render, keyboard nav). Exposes GMTI.openIssueSearch.
+src/content.js         DOM glue — the ONLY file with the keydown/paste listeners. Capture-phase
+                       keydown (Tab, Shift/plain Enter, wrap chars, Ctrl+; issue search) + paste;
+                       field detection; execCommand apply.
 src/editor.css         Monospace font on the markdown textareas (manifest-injected).
-tests/indent.test.js   Unit tests for src/indent.js (node:test). The only test file.
+src/issue-search.css   Styling for the issue-search overlay panel (manifest-injected).
+tests/indent.test.js   Unit tests for src/indent.js (node:test).
+tests/issue-search.test.js  Unit tests for src/issue-search.js (node:test).
 docs/superpowers/specs/ Design docs (one per feature, dated).
 docs/superpowers/plans/ Implementation plans (one per feature, dated).
 ```
@@ -41,7 +49,7 @@ GitHub handle it). Key functions: `listMarker`, `precedingListContentCols`, `nex
 ## Testing
 
 ```bash
-npm test          # or: node --test   — runs tests/indent.test.js (Node >= 18, zero deps)
+npm test          # or: node --test   — runs the tests/ suite (Node >= 18, zero deps)
 ```
 
 All editing *logic* is unit-tested as pure functions. `src/content.js` is DOM glue and is
@@ -51,7 +59,8 @@ All editing *logic* is unit-tested as pure functions. `src/content.js` is DOM gl
 The real behavior (and anything in `content.js`) is verified against real GitHub via the
 Playwright MCP browser, driving the actual loaded extension. Pattern used throughout:
 1. Ask the user to **reload** the extension on `chrome://extensions` (load-unpacked doesn't
-   hot-reload — the loaded build is a snapshot of disk).
+   hot-reload — the loaded build is a snapshot of disk) **and then reload the GitHub page** —
+   reloading the extension alone does NOT re-inject the content script into an already-open tab.
 2. Open a fresh GitHub comment box (e.g. `https://github.com/chrismyang/hammersmith/issues/1`).
 3. Confirm the page's main world is clean (`typeof globalThis.GMTI === 'undefined'` — the
    extension runs in the isolated world), then drive real key/paste events and read back
