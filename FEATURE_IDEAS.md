@@ -5,7 +5,8 @@ from the live DOM probes (2026-06-03) so we don't re-investigate later.
 
 **Already shipped:** Tab/Shift-Tab list-aware indent (v1 + v2), Shift+Enter in-item
 continuation + Enter-to-new-item, monospace editor font, multi-line paste re-indent,
-selection wrapping with surrounding characters, and the Ctrl+; in-composer issue search.
+selection wrapping with surrounding characters, the Ctrl+; in-composer issue search, and hover+`e`
+fast-edit for existing comments/descriptions.
 
 ## Probe findings that apply to everything here
 
@@ -51,4 +52,11 @@ Dim the URL portion of a markdown link (and potentially other light syntax highl
   fragility above is the only residual issue found there.
 - Keyboard shorcuts for common operators
   - Toggle preview/edit mode
-  - Toggle edit / view mode (not sure how it'll "select" which comment/description I'm referring to though)
+- **Verify hover+`e` fast-edit on the remaining surfaces.** Shipped + live-verified on the issue
+  description + timeline comments (new React UI). The detection is surface-agnostic (smallest
+  ancestor of the cursor holding both a `.markdown-body` and a `button[aria-haspopup="true"]` with
+  an `octicon-kebab-horizontal` icon), so PR descriptions/timeline comments are expected to work
+  identically, but **PR inline review comments** and the **Projects issue side-pane** were not yet
+  live-verified — confirm hover outlines the right container and `e` opens the editor there, and
+  extend the engine if a surface's kebab/body signal differs.
+- BUG: in new issue modal triggered by the project view "new issue" button, Ctrl+; search flashes but doesn't stay up

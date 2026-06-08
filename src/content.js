@@ -70,6 +70,19 @@
         } catch (err) { /* never break the box */ }
         return;
       }
+      // Fast-edit: a bare 'e' while hovering a rendered comment/description flips
+      // it into GitHub's native edit mode (target = the hovered comment). Stands
+      // down while typing in any field so 'e' types normally.
+      if (e.key === 'e' && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey && !e.isComposing) {
+        const t = e.target;
+        const inField = t instanceof HTMLElement &&
+          (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
+        if (inField || !GMTI.quickEditHovered) return;
+        let acted = false;
+        try { acted = GMTI.quickEditHovered(); } catch (err) { acted = false; }
+        if (acted) { e.preventDefault(); e.stopPropagation(); }
+        return;
+      }
       if (e.ctrlKey || e.altKey || e.metaKey) return; // leave Ctrl/⌘+Enter (submit) etc. alone
       const isTab = e.key === 'Tab';
       const isShiftEnter = e.key === 'Enter' && e.shiftKey;

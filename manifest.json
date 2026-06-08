@@ -6,8 +6,8 @@
   "content_scripts": [
     {
       "matches": ["https://github.com/*"],
-      "js": ["src/indent.js", "src/issue-search.js", "src/issue-search-ui.js", "src/content.js"],
-      "css": ["src/editor.css", "src/issue-search.css"],
+      "js": ["src/indent.js", "src/issue-search.js", "src/issue-search-ui.js", "src/quick-edit.js", "src/content.js"],
+      "css": ["src/editor.css", "src/issue-search.css", "src/quick-edit.css"],
       "run_at": "document_idle"
     }
   ]

@@ -23,18 +23,24 @@ rather than duplicating it here. Backlog and probe findings live in `FEATURE_IDE
 ```
 manifest.json          MV3; one content_scripts entry on https://github.com/* :
                        js = [src/indent.js, src/issue-search.js, src/issue-search-ui.js,
-                       src/content.js], css = [src/editor.css, src/issue-search.css]
+                       src/quick-edit.js, src/content.js], css = [src/editor.css,
+                       src/issue-search.css, src/quick-edit.css]
 src/indent.js          PURE logic — no DOM. All text-edit computations + helpers. Exported on
                        globalThis.GMTI.* (for the content script) AND module.exports (for tests).
 src/issue-search.js    PURE logic — no DOM/network. Issue-search query/URL building, parsing the
                        /search embedded-JSON blob, reference building. On GMTI.* + module.exports.
 src/issue-search-ui.js DOM/network glue — the caret-anchored search overlay (mirror-div position,
                        same-origin fetch, render, keyboard nav). Exposes GMTI.openIssueSearch.
+src/quick-edit.js      DOM/event glue — hover an editable comment/description (subtle outline) and
+                       press 'e' to flip it into GitHub's native edit mode. Tracks the hovered
+                       comment (document mouseover) and drives GitHub's own kebab→Edit flow.
+                       Exposes GMTI.quickEditHovered (called from content.js).
 src/content.js         DOM glue — the ONLY file with the keydown/paste listeners. Capture-phase
-                       keydown (Tab, Shift/plain Enter, wrap chars, Ctrl+; issue search) + paste;
-                       field detection; execCommand apply.
+                       keydown (Tab, Shift/plain Enter, wrap chars, Ctrl+; issue search, bare 'e'
+                       fast-edit when hovering a comment) + paste; field detection; execCommand apply.
 src/editor.css         Monospace font on the markdown textareas (manifest-injected).
 src/issue-search.css   Styling for the issue-search overlay panel (manifest-injected).
+src/quick-edit.css     Styling for the fast-edit hover outline (manifest-injected).
 tests/indent.test.js   Unit tests for src/indent.js (node:test).
 tests/issue-search.test.js  Unit tests for src/issue-search.js (node:test).
 docs/superpowers/specs/ Design docs (one per feature, dated).
