@@ -85,6 +85,8 @@
       li.addEventListener('mousedown', function (e) { e.preventDefault(); sel = i; choose(); });
       list.appendChild(li);
     });
+    const selEl = list.querySelector('.gmti-is-sel');
+    if (selEl) selEl.scrollIntoView({ block: 'nearest' });
   }
 
   function move(delta) {
