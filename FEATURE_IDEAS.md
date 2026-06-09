@@ -63,4 +63,3 @@ Dim the URL portion of a markdown link (and potentially other light syntax highl
   the **PR description**, **PR inline review comments**, and the **Projects issue side-pane**. For
   each: find the container the cursor sits in, confirm `findKebab` resolves its (single) kebab, add
   the selector, and verify hover outlines it + `e` opens the editor.
-- BUG: in new issue modal triggered by the project view "new issue" button, Ctrl+; search flashes but doesn't stay up

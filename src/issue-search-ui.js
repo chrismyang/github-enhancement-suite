@@ -174,12 +174,28 @@
     hint.className = 'gmti-is-hint';
     hint.textContent = '↑↓ navigate · ↵ insert · esc close';
     panel.appendChild(input); panel.appendChild(list); panel.appendChild(hint);
-    document.body.appendChild(panel);
+    // When the field is inside a focus-trapping modal (e.g. the project "new
+    // issue" dialog), append the panel INSIDE that dialog. Appended to body it
+    // sits outside the trap, so focusing our input gets bounced back into the
+    // dialog and the focusout handler immediately closes us — the panel just
+    // flashes. Inside the dialog the trap treats our input as its own, so focus
+    // stays. There we position fixed to the viewport (no transform ancestors);
+    // otherwise keep the page-absolute behavior appended to body.
+    const modal = textarea.closest('[role="dialog"][aria-modal="true"], dialog[open]');
+    (modal || document.body).appendChild(panel);
 
     const c = caretCoords(textarea);
-    const maxLeft = window.scrollX + document.documentElement.clientWidth - panel.offsetWidth - 8;
-    panel.style.left = Math.max(window.scrollX + 8, Math.min(c.x, maxLeft)) + 'px';
-    panel.style.top = c.y + 'px';
+    if (modal) {
+      const vx = c.x - window.scrollX, vy = c.y - window.scrollY;
+      const maxLeft = document.documentElement.clientWidth - panel.offsetWidth - 8;
+      panel.style.position = 'fixed';
+      panel.style.left = Math.max(8, Math.min(vx, maxLeft)) + 'px';
+      panel.style.top = vy + 'px';
+    } else {
+      const maxLeft = window.scrollX + document.documentElement.clientWidth - panel.offsetWidth - 8;
+      panel.style.left = Math.max(window.scrollX + 8, Math.min(c.x, maxLeft)) + 'px';
+      panel.style.top = c.y + 'px';
+    }
 
     lastQuery = null; results = []; sel = -1;
     render();
