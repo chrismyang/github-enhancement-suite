@@ -70,16 +70,17 @@
         } catch (err) { /* never break the box */ }
         return;
       }
-      // Fast-edit: a bare 'e' while hovering a rendered comment/description flips
-      // it into GitHub's native edit mode (target = the hovered comment). Stands
-      // down while typing in any field so 'e' types normally.
-      if (e.key === 'e' && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey && !e.isComposing) {
+      // Fast actions on the hovered comment/description: bare 'e' edits, bare 'c'
+      // copies its link (driving GitHub's own menu). Target = the hovered comment.
+      // Stands down while typing in any field so the keys type normally.
+      if ((e.key === 'e' || e.key === 'c') && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey && !e.isComposing) {
         const t = e.target;
         const inField = t instanceof HTMLElement &&
           (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
-        if (inField || !GMTI.quickEditHovered) return;
+        const fn = e.key === 'e' ? GMTI.quickEditHovered : GMTI.quickCopyHovered;
+        if (inField || !fn) return;
         let acted = false;
-        try { acted = GMTI.quickEditHovered(); } catch (err) { acted = false; }
+        try { acted = fn(); } catch (err) { acted = false; }
         if (acted) { e.preventDefault(); e.stopPropagation(); }
         return;
       }

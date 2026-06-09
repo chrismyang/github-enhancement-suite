@@ -5,8 +5,9 @@ from the live DOM probes (2026-06-03) so we don't re-investigate later.
 
 **Already shipped:** Tab/Shift-Tab list-aware indent (v1 + v2), Shift+Enter in-item
 continuation + Enter-to-new-item, monospace editor font, multi-line paste re-indent,
-selection wrapping with surrounding characters, the Ctrl+; in-composer issue search, and hover+`e`
-fast-edit for existing comments/descriptions.
+selection wrapping with surrounding characters, the Ctrl+; in-composer issue search, and the hover
+affordance for existing comments/descriptions (outline + a header mini-toolbar with Edit/Copy-link,
+and `e`/`c` shortcuts).
 
 ## Probe findings that apply to everything here
 

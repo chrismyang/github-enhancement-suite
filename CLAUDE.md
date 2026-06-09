@@ -31,13 +31,16 @@ src/issue-search.js    PURE logic — no DOM/network. Issue-search query/URL bui
                        /search embedded-JSON blob, reference building. On GMTI.* + module.exports.
 src/issue-search-ui.js DOM/network glue — the caret-anchored search overlay (mirror-div position,
                        same-origin fetch, render, keyboard nav). Exposes GMTI.openIssueSearch.
-src/quick-edit.js      DOM/event glue — hover an editable comment/description (subtle outline) and
-                       press 'e' to flip it into GitHub's native edit mode. Tracks the hovered
-                       comment (document mouseover) and drives GitHub's own kebab→Edit flow.
-                       Exposes GMTI.quickEditHovered (called from content.js).
+src/quick-edit.js      DOM/event glue — hover an editable comment/description (subtle outline +
+                       a mini-toolbar in the header: Edit, Copy link). Press 'e' to edit / 'c' to
+                       copy link; the toolbar buttons do the same and their tooltips teach the
+                       shortcuts. Tracks the hovered comment (document mouseover) and drives
+                       GitHub's own kebab→menu flow (clickMenuItem). Exposes GMTI.quickEditHovered
+                       + GMTI.quickCopyHovered (called from content.js).
 src/content.js         DOM glue — the ONLY file with the keydown/paste listeners. Capture-phase
                        keydown (Tab, Shift/plain Enter, wrap chars, Ctrl+; issue search, bare 'e'
-                       fast-edit when hovering a comment) + paste; field detection; execCommand apply.
+                       edit / 'c' copy-link when hovering a comment) + paste; field detection;
+                       execCommand apply.
 src/editor.css         Monospace font on the markdown textareas (manifest-injected).
 src/issue-search.css   Styling for the issue-search overlay panel (manifest-injected).
 src/quick-edit.css     Styling for the fast-edit hover outline (manifest-injected).

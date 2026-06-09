@@ -9,3 +9,67 @@
     0 0 0 2px var(--borderColor-accent-emphasis, #0969da),
     0 6px 20px rgba(31, 35, 40, 0.28);
 }
+
+/* Mini-toolbar injected into the comment header (Edit + Copy link). */
+.gmti-qe-toolbar {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: 4px;
+}
+.gmti-qe-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fgColor-muted, #59636e);
+  cursor: pointer;
+}
+.gmti-qe-btn:hover {
+  background: var(--bgColor-neutral-muted, rgba(175, 184, 193, 0.2));
+  color: var(--fgColor-default, #1f2328);
+}
+.gmti-qe-btn .octicon { fill: currentColor; }
+
+/* Custom tooltip styled to match GitHub's (dark box + caret, centered below). */
+.gmti-qe-btn::after {
+  content: attr(data-gmti-tip);
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: var(--bgColor-emphasis, #24292f);
+  color: var(--fgColor-onEmphasis, #ffffff);
+  font-size: 11px;
+  line-height: 1.4;
+  padding: 4px 8px;
+  border-radius: 6px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.1s ease-in;
+  z-index: 100;
+}
+.gmti-qe-btn::before {
+  content: "";
+  position: absolute;
+  top: calc(100% + 1px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-bottom-color: var(--bgColor-emphasis, #24292f);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.1s ease-in;
+  z-index: 100;
+}
+.gmti-qe-btn:hover::after, .gmti-qe-btn:focus-visible::after,
+.gmti-qe-btn:hover::before, .gmti-qe-btn:focus-visible::before {
+  opacity: 1;
+}
