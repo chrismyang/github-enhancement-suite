@@ -60,8 +60,13 @@ that's the path that classically crashes, and it never occurred.
   - **Copy link** (link octicon) → drives kebab→"Copy link" (gives GitHub's real canonical URL and
     its native "Copied!" toast for free).
 - **Tooltips:** each button shows a small tooltip on hover with the action + shortcut: _"Edit (e)"_,
-  _"Copy link (c)"_ (lightweight CSS tooltip via a data-attribute; no JS, no dependency on GitHub's
-  tooltip component).
+  _"Copy link (c)"_. Implemented as our own lightweight CSS tooltip (`:hover`-driven via a
+  data-attribute; no JS), **styled to visually match GitHub's tooltip** (dark background, same
+  padding/radius/font-size, pointing up from below the button). We deliberately do *not* reuse
+  Primer's TooltipV2 — it's a JS-driven Popover-API component with a per-build hashed class, so
+  cloning its markup wouldn't show/position without re-implementing its behavior and coupling to
+  Primer internals; a self-contained CSS tooltip is more robust. Trade-off: not pixel-identical and
+  could drift if GitHub restyles tooltips (acceptable).
 - **Keyboard:** `c` (Copy link) is added in `content.js`, mirroring the `e` branch exactly — bare
   key, no modifiers, not composing, target not an editable field, a comment hovered; only then
   `preventDefault()`+`stopPropagation()` and act. `e` is unchanged.
