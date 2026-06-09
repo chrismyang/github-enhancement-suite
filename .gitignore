@@ -4,6 +4,9 @@
 # Dependencies (none currently; tests use Node's built-in runner)
 node_modules/
 
+# Build output (store-ready zips)
+dist/
+
 # OS / editor cruft
 .DS_Store
 *.swp

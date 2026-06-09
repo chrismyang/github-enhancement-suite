@@ -1,8 +1,23 @@
 {
   "manifest_version": 3,
-  "name": "GitHub Markdown Tab Indent",
-  "version": "1.0.0",
-  "description": "Better editing for GitHub markdown textareas: Tab/Shift-Tab list-aware indent, Shift+Enter in-item continuation, Enter to start a new item, and a monospace editor font.",
+  "name": "GitHub Enhancement Suite",
+  "version": "1.0.1",
+  "description": "Better GitHub editing: Tab-indent markdown lists, monospace editor, Ctrl+; to search issue links, 'e' to quick-edit comments.",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "GitHub Enhancement Suite",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
   "content_scripts": [
     {
       "matches": ["https://github.com/*"],

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect x="0" y="0" width="128" height="128" rx="28" ry="28" fill="#24292f"/>
+  <g fill="none" stroke-width="8" stroke-linecap="round">
+    <!-- main lane -->
+    <line x1="48" y1="22" x2="48" y2="66" stroke="#ffffff"/>
+    <!-- branch out + merge back (git graph) -->
+    <path d="M48 26 C48 40 80 30 80 44" stroke="#3fb950"/>
+    <path d="M80 44 C80 58 48 50 48 64" stroke="#3fb950"/>
+  </g>
+  <g stroke="none">
+    <circle cx="48" cy="22" r="8" fill="#ffffff"/>
+    <circle cx="48" cy="66" r="8" fill="#ffffff"/>
+    <circle cx="80" cy="44" r="8" fill="#3fb950"/>
+  </g>
+  <text x="64" y="108" text-anchor="middle" font-family="-apple-system, Helvetica, Arial, sans-serif"
+        font-size="30" font-weight="700" fill="#ffffff" letter-spacing="1">GHES</text>
+</svg>

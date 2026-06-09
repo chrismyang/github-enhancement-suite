@@ -1,10 +1,11 @@
 {
-  "name": "github-markdown-tab-indent",
-  "version": "1.0.0",
+  "name": "github-enhancement-suite",
+  "version": "1.0.1",
   "private": true,
-  "description": "Tab / Shift-Tab indent and dedent in GitHub markdown textareas.",
+  "description": "Better GitHub editing: list-aware indent, monospace editor, issue-link search, and quick-edit.",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "package": "bash scripts/package.sh"
   },
   "engines": {
     "node": ">=18"
