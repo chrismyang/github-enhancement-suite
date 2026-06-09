@@ -6,8 +6,16 @@
   if (!GMTI) return;
 
   const TARGET_CLASS = 'gmti-qe-target';
-  const MAX_ASCENT = 25;        // ancestors to climb when resolving a comment
   const EDIT_POLL_FRAMES = 20;  // ~320ms cap waiting for the menu's "Edit" item
+
+  // Comment containers we recognize. closest() against these answers "is the
+  // cursor inside a comment?" precisely. (An earlier "smallest ancestor holding
+  // a .markdown-body + a kebab" heuristic wrongly matched <html> whenever the
+  // cursor was outside every comment, since the whole page contains both.)
+  const COMMENT_SEL = [
+    '[data-testid^="comment-viewer-outer-box-"]', // issue/PR timeline comment (React)
+    '[data-testid="issue-body"]',                 // issue/PR description (React)
+  ].join(',');
 
   let current = null;           // the currently-outlined comment container
   let busy = false;             // an edit dance is in flight (ignore re-entry)
@@ -23,15 +31,12 @@
     return null;
   }
 
-  // A comment container = the smallest ancestor of `el` that holds both a
-  // rendered markdown body and its own kebab. Identifies one comment (or the
-  // issue/PR description) without depending on per-surface testids.
+  // The comment/description under `el`, or null if `el` isn't inside one we can
+  // edit (requires a recognized container that actually has an Edit kebab).
   function commentContainerOf(el) {
-    let node = el;
-    for (let i = 0; i < MAX_ASCENT && node && node.nodeType === 1; i++) {
-      if (node.querySelector('.markdown-body') && findKebab(node)) return node;
-      node = node.parentElement;
-    }
+    let node = null;
+    try { node = el && el.closest ? el.closest(COMMENT_SEL) : null; } catch (err) { return null; }
+    if (node && findKebab(node)) return node;
     return null;
   }
 

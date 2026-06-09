@@ -52,11 +52,14 @@ Dim the URL portion of a markdown link (and potentially other light syntax highl
   fragility above is the only residual issue found there.
 - Keyboard shorcuts for common operators
   - Toggle preview/edit mode
-- **Verify hover+`e` fast-edit on the remaining surfaces.** Shipped + live-verified on the issue
-  description + timeline comments (new React UI). The detection is surface-agnostic (smallest
-  ancestor of the cursor holding both a `.markdown-body` and a `button[aria-haspopup="true"]` with
-  an `octicon-kebab-horizontal` icon), so PR descriptions/timeline comments are expected to work
-  identically, but **PR inline review comments** and the **Projects issue side-pane** were not yet
-  live-verified — confirm hover outlines the right container and `e` opens the editor there, and
-  extend the engine if a surface's kebab/body signal differs.
+- **Extend hover+`e` fast-edit to the remaining surfaces.** Shipped + live-verified on the issue
+  description (`[data-testid="issue-body"]`) + timeline comments (`[data-testid^="comment-viewer-
+  outer-box-"]`), new React UI. Detection is now an explicit `closest(COMMENT_SEL)` match in
+  `quick-edit.js` (the original surface-agnostic "smallest ancestor with a `.markdown-body` + kebab"
+  heuristic was reverted — it wrongly outlined `<html>` whenever the cursor was outside every
+  comment). So the not-yet-covered surfaces need their **container selector added to `COMMENT_SEL`**
+  and then live-verified: PR timeline comments (likely the same `comment-viewer-outer-box-` testid),
+  the **PR description**, **PR inline review comments**, and the **Projects issue side-pane**. For
+  each: find the container the cursor sits in, confirm `findKebab` resolves its (single) kebab, add
+  the selector, and verify hover outlines it + `e` opens the editor.
 - BUG: in new issue modal triggered by the project view "new issue" button, Ctrl+; search flashes but doesn't stay up
